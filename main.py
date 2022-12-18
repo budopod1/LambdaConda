@@ -205,7 +205,7 @@ class Token:
             for child in self.value:
                 if not allowed(child):
                     continue
-                cancel = child.visit(visitor, arguments, mode)
+                cancel = child.visit(visitor, arguments, allowed, mode)
                 if cancel:
                     return cancel
         return None
@@ -213,7 +213,7 @@ class Token:
 
 class Instance:
     def __init__(self):
-        self.type_ = Type(BasicType.none)
+        self.type_ = Type.none
 
     def __str__(self):
         return repr(self)
@@ -243,7 +243,11 @@ class Type:
         return not (self == other)
 
     def __str__(self):
-        return f"{self.type_}<{', '.join(self.generics)}>"
+        generics = [str(generic) for generic in self.generics]
+        return f"{self.type_}<{', '.join(generics)}>"
+
+
+Type.none = Type(BasicType.none)
 
 
 class TokenMatch:
@@ -308,7 +312,7 @@ class Operand(Token):
         return type_
 
     def _compute_type(self):
-        return Type(BasicType.none)
+        return Type.none
 
 
 class Scope:
@@ -652,7 +656,7 @@ class Tuple(Operand):
     def _compute_type(self):
         child_types = [child.type_() for child in self.value]
         if any([type_.type_ == BasicType.none for type_ in child_types]):
-            return Type(BasicType.none)
+            return Type.none
         return Type(BasicType.tuple, child_types)
 
 
@@ -665,7 +669,7 @@ class FunctionCall(Operand):
         func, _ = self.value
         func_type = func.type_()
         if not func_type.generics:
-            return Type(BasicType.none)
+            return Type.none
         return func.type_().generics[0]
 
 
@@ -719,11 +723,20 @@ class Constant(Refrence):
 
 class Function(Operand, Block):
     def _compute_type(self):
-        def return_visit(token):
-            
-        self.visit(return_visit, tuple(), 
-                   lambda t: not t.is_a(Block)
-                  )
+        def return_visit(token, arguments):
+            if token.is_a(Return):
+                return_type = token.type_()
+                if return_type:
+                    return return_type
+        return_type = self.visit(
+            return_visit, 
+            tuple(), 
+            lambda t: not t.is_a(Block)
+        )
+        if return_type:
+            return Type(BasicType.func, [return_type])
+        else:
+            return Type.none
 
 
 class StringSearch:
@@ -893,7 +906,7 @@ def main(code):
         while found_any:
             found_any = False
             for rule in transform_group:
-                found_any = code.visit(transform_visit, (rule, ))
+                found_any = code.visit(transform_visit, (rule,))
                 if found_any:
                     break
 
@@ -965,9 +978,10 @@ b -> {
     d -> 3
     print("hi\n\r\"\\" + d)
     c -> c + 1
+    return c
 }
 
-b()
+print(b())
 
 for(a, {
     b()
