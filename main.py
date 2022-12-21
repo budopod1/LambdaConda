@@ -4,7 +4,7 @@ numbers = "1234567890"
 
 
 class EnumValue:
-    def __init__(self, enum, value):
+    def __init__(self,enum, value):
         self.enum = enum
         self.value = value
 
@@ -294,7 +294,6 @@ class Symbolic(Token):  # Represents something temporary, but /w structure
 
 
 class Operand(Token):
-
     def startOPERAND(self):
         self.instance = Instance()
 
@@ -307,6 +306,7 @@ class Operand(Token):
 
     def compute_type(self):
         type_ = self._compute_type()
+        assert isinstance(type_, Type), "Type must be Type"
         if type_.type_ != BasicType.none:
             self.type_(type_)
         return type_
@@ -728,15 +728,18 @@ class Function(Operand, Block):
                 return_type = token.type_()
                 if return_type:
                     return return_type
+                else:
+                    return Type.none
         return_type = self.visit(
             return_visit, 
             tuple(), 
             lambda t: not t.is_a(Block)
         )
         if return_type:
+            if return_type.type_ == BasicType.none:
+                return Type.none
             return Type(BasicType.func, [return_type])
-        else:
-            return Type.none
+        return Type(BasicType.func, [Type.none])
 
 
 class StringSearch:
@@ -929,9 +932,7 @@ def main(code):
             name = condense_tokens(name.value)
             if scope.get(name) is not None:
                 return
-            # print("assign", token.instance)
             changed = scope.assign(name, token.instance)
-            # print(name.value, type_, changed)
             if changed:
                 return True
 
@@ -944,15 +945,12 @@ def main(code):
             instance = scope.get(name)
             if instance is None:  # type_.type_ == BasicType.none
                 return
-            # print(scope.scope)
-            # print("get", instance)
             token.instance = instance
             return True
 
     def compute_visit(token, args):
         if isinstance(token, Operand):
             token.compute_type()
-            # print(token.type_())
 
     found_any = True
     while found_any:
@@ -981,7 +979,11 @@ b -> {
     return c
 }
 
-print(b())
+e -> {
+    print(b())
+}
+
+e()
 
 for(a, {
     b()
