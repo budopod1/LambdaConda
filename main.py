@@ -10,7 +10,7 @@ class EnumValue:
 
     def __eq__(self, other):
         if not isinstance(other, EnumValue):
-            raise TypeError("Cannot compare EnumValue with other types")
+            raise TypeError(f"Cannot compare EnumValue with {type(other)}")
         return self.enum == other.enum and self.value == other.value
 
     def __ne__(self, other):
@@ -49,6 +49,7 @@ TokenType = Enum("TokenType", "TEXT", "TREE")
 TokenSearchStatus = Enum("TokenSearchStatus", "FAIL", "CONTINUE", "FINISH",
                          "TERMINATE")
 TokenVisitMode = Enum("TokenVisitMode", "DEPTH")
+TokenExtraData = Enum("TokenExtraData", "CAPPED")
 BasicType = Enum("BasicType", "int", "float", "bool", "str", "func", "none",
                  "tuple")
 TAB = "    "
@@ -276,11 +277,13 @@ class Node(Token):  # Base class for any structure in the final IR
 class Text(Token):  # Just text, stores snippets of code from source
     def assertions(self):
         assert self.is_text(), "Text Token stores text"
-        assert type(self) == Text,\
-                "Text Token is final; cannot be subclassed"
 
     def stringify(self):
         return self.value
+
+
+class Name(Node):
+    pass
 
 
 class Symbolic(Token):  # Represents something temporary, but /w structure
@@ -351,6 +354,10 @@ class Block(Node):
     INDENT = TAB
 
 
+class TypeToken(Operand):
+    pass
+
+
 class TokenConversion:  # make into data class
 
     def __init__(self, find, replace):
@@ -393,6 +400,37 @@ class TextRule:
         return tokenify(self.replace_with)
 
 
+class SetRule:
+    # Replace a set of pieces of text with a token containing
+    # that text
+    def __init__(self, options, holder):
+        self.options = options
+        self.holder = holder
+        self.i = 0
+
+    def __call__(self, token):
+        text = token.value if token.is_text() else None
+
+        options = list(filter(
+            lambda option: text == option[self.i], 
+            self.options
+        ))
+        
+        self.i += 1
+
+        for option in options:
+            if self.i == len(option):
+                return TokenSearchStatus.FINISH
+        
+        if len(options) == 0:
+            return TokenSearchStatus.FAIL
+            
+        return TokenSearchStatus.CONTINUE
+        
+    def result(self, tokens):
+        return [self.holder(tokens, [self.factory])]
+
+
 class GroupRule:
     def __init__(self, types, keep, holder):
         self.types = types
@@ -412,8 +450,26 @@ class GroupRule:
         return [
             self.holder(
                 [token for i, token in enumerate(tokens) if i in self.keep],
-                [self.factory])
+                [self.factory]
+            )
         ]
+
+
+class CollapseRule:
+    def __init__(self, parent, children):
+        self.parent = parent
+        self.children = children
+
+    def __call__(self, token):
+        if token.is_a(self.parent):
+            for expected, child in zip(self.children, token.value):
+                if not child.is_a(expected):
+                    return TokenSearchStatus.FAIL
+            return TokenSearchStatus.FINISH
+        return TokenSearchStatus.FAIL
+
+    def result(self, tokens):
+        return tokens[0].value
 
 
 class MergeRule:
@@ -444,6 +500,22 @@ class MergeRule:
                 else:
                     result.append(token)
         return [self.convert(result)]
+
+
+class ConvertRule:
+    def __init__(self, start, end):
+        self.start = start
+        self.end = end
+
+    def __call__(self, token):
+        if token.is_a(self.start):
+            return TokenSearchStatus.FINISH
+        else:
+            return TokenSearchStatus.FAIL
+
+    def result(self, tokens):
+        token, = tokens
+        return [self.end(token.value)]
 
 
 class RemoveRule:
@@ -593,6 +665,12 @@ def condense_tokens(tokens):
     return "".join([str(token) for token in tokens])
 
 
+def tagged(token, tags):
+    def inner(*args):
+        return token(*args, tags=tags)
+    return inner
+    
+
 # CUSTOM CODE START
 
 
@@ -633,6 +711,12 @@ class Comma(Symbolic):
 
 
 class Operator(Symbolic):
+    pass
+
+
+class Typer(Symbolic):
+    # A colon, used the same way as weak typing
+    # in python, however this typing is strong
     pass
 
 
@@ -742,6 +826,22 @@ class Function(Operand, Block):
         return Type(BasicType.func, [Type.none])
 
 
+class ArgumentFunction(Function):
+    pass
+
+
+class Argument(Node):
+    pass
+
+
+class Arguments(Node):
+    pass
+
+
+class UnfinishedArguments(Arguments):
+    pass
+
+
 class StringSearch:
     def __init__(self):
         self.expected = '"'
@@ -840,6 +940,7 @@ def main(code):
         create_text_conversion(" ", Space),
         create_text_conversion("\n", Newline),
         create_text_conversion(",", Comma),
+        create_text_conversion(":", Typer),
     ])
 
     print("Starting number search...")
@@ -857,12 +958,16 @@ def main(code):
         name = next(token_search(code, NameSearch), None)
         if name is None:
             break
-        replace_token_search_match(code, name, [Variable(name.tokens)])
+        replace_token_search_match(code, name, [Name(name.tokens)])
 
     print("Starting ast formation...")
 
     transform_groups = [
         [lambda: RemoveRule([Whitespace])],
+        [
+            lambda: SetRule(list(BasicType), TypeToken),
+            lambda: CollapseRule(Name, (TypeToken,))
+        ],
         [
             lambda: BoundaryRule(
                 FunctionOpen, FunctionClose, Function, allow_text=True)
@@ -881,10 +986,41 @@ def main(code):
                               (0, 2), Assignment),
             lambda: GroupRule([ReturnOperator, Operand],
                             (1,), Return),
-            lambda: GroupRule([Operand, Comma], (0, ), UnfinishedTuple),
+            lambda: GroupRule([Name, Typer, TypeToken], (0, 2), Argument),
+            lambda: ConvertRule(Name, Variable),
+            lambda: GroupRule([Arguments, Function], (0, 1),
+                              ArgumentFunction),
+
+            lambda: MergeRule(
+                [UnfinishedArguments, Argument, Comma],
+                0, (1,), UnfinishedArguments
+            ),
+            lambda: GroupRule(
+                [GroupOpen, Argument, Comma, Argument, Comma],
+                (1, 3), UnfinishedArguments
+            ),
+            lambda: GroupRule(
+                [GroupOpen, Argument, Comma, Argument, GroupClose],
+                (1, 3), Arguments
+            ),
+            lambda: GroupRule([GroupOpen, Argument, GroupClose],
+                              (1,), Arguments),
+            lambda: MergeRule(
+                [UnfinishedArguments, Argument, GroupClose], 0,
+                (1,), Arguments
+            ),
+            
+            # Hardcode for tuples of length 2 or less
             lambda: MergeRule([UnfinishedTuple, Operand, Comma], 0,
                               (1, ), UnfinishedTuple),
+            lambda: GroupRule([Operand, Comma, Operand, Comma],
+                              (0, 2), UnfinishedTuple),
+            lambda: GroupRule([Operand, Comma, Operand],
+                              (0, 2), Tuple),
+            lambda: GroupRule([Operand, Comma],
+                              (0, ), Tuple),
             lambda: MergeRule([UnfinishedTuple, Operand], 0, (1, ), Tuple),
+            
             lambda: GroupRule([Operand, Tuple], (0, 1), FunctionCall),
             lambda: GroupRule([Operand, Group], (0, 1), FunctionCall),
         ]
@@ -911,9 +1047,12 @@ def main(code):
             for rule in transform_group:
                 found_any = code.visit(transform_visit, (rule,))
                 if found_any:
+                    print(code)
                     break
 
     code.ensure_parents()
+
+    print(code)
 
     print("Starting type inference...")
 
@@ -967,32 +1106,16 @@ def main(code):
     print(code)
 
 
+def run(file):
+    with open(file) as file:
+        text = file.read()
+    main(text)
+
+
 if __name__ == "__main__":
-    main(r'''
-a -> 3 + -1
-c -> 1
+    run("tuple.ll")
 
-b -> {
-    d -> 3
-    print("hi\n\r\"\\" + d)
-    c -> c + 1
-    return c
-}
 
-e -> {
-    print(b())
-}
-
-e()
-
-for(a, {
-    b()
-    d -> 5 - 4
-    print(d)
-})
-
-print(c)
-''')
 # Cool regex:
 # /for .* in .*\.value/
 # /class \w*:\n\s*\n/
