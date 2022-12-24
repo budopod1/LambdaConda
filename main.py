@@ -379,6 +379,9 @@ class Constants:
     def __iter__(self):
         return (v for v in self.constants.items())
 
+    def __str__(self):
+        return f"Constants{self.constants}"
+
 
 class TextRule:
     def __init__(self, expected, replace_with):
@@ -411,18 +414,18 @@ class SetRule:
     def __call__(self, token):
         text = token.value if token.is_text() else None
 
-        options = list(filter(
+        self.options = list(filter(
             lambda option: text == option[self.i], 
             self.options
         ))
         
         self.i += 1
 
-        for option in options:
+        for option in self.options:
             if self.i == len(option):
                 return TokenSearchStatus.FINISH
         
-        if len(options) == 0:
+        if len(self.options) == 0:
             return TokenSearchStatus.FAIL
             
         return TokenSearchStatus.CONTINUE
@@ -967,6 +970,8 @@ def main(code):
     transform_groups = [
         [lambda: RemoveRule([Whitespace])],
         [
+            # TODO: make it only affect entire "name" tokens instead of fixing
+            # inside strings
             lambda: SetRule(list(BasicType), TypeToken),
             lambda: CollapseRule(Name, (TypeToken,))
         ],
@@ -977,8 +982,6 @@ def main(code):
         [
             lambda: GroupRule([GroupOpen, Operand, GroupClose], (1, ), Group),
             lambda: GroupRule([GroupOpen, GroupClose], tuple(), Tuple),
-            lambda: GroupRule([Operand, MinusOperator, Operand],
-                              (0, 2), Subtraction),
             lambda: GroupRule([MinusOperator, Operand], (1, ), Negation),
             lambda: GroupRule([Operand, MinusOperator, Operand],
                               (0, 2), Subtraction),
@@ -1048,12 +1051,9 @@ def main(code):
             for rule in transform_group:
                 found_any = code.visit(transform_visit, (rule,))
                 if found_any:
-                    print(code)
                     break
 
     code.ensure_parents()
-
-    print(code)
 
     print("Starting type inference...")
 
@@ -1105,6 +1105,7 @@ def main(code):
         break
 
     print(code)
+    print(constants)
 
 
 def run(file):
@@ -1114,8 +1115,7 @@ def run(file):
 
 
 if __name__ == "__main__":
-    input()
-    run("tuple.ll")
+    run("scope.ll")
 
 
 # Cool regex:
