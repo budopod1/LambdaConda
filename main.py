@@ -405,7 +405,7 @@ class SetRule:
     # that text
     def __init__(self, options, holder):
         self.options = options
-        self.holder = holder
+        self.holder = capped(holder)
         self.i = 0
 
     def __call__(self, token):
@@ -428,14 +428,14 @@ class SetRule:
         return TokenSearchStatus.CONTINUE
         
     def result(self, tokens):
-        return [self.holder(tokens, [self.factory])]
+        return [self.holder(tokens)]
 
 
 class GroupRule:
     def __init__(self, types, keep, holder):
         self.types = types
         self.keep = keep
-        self.holder = holder
+        self.holder = capped(holder)
 
     def __call__(self, token):
         expected = self.types.pop(0)
@@ -449,8 +449,7 @@ class GroupRule:
     def result(self, tokens):
         return [
             self.holder(
-                [token for i, token in enumerate(tokens) if i in self.keep],
-                [self.factory]
+                [token for i, token in enumerate(tokens) if i in self.keep]
             )
         ]
 
@@ -505,7 +504,7 @@ class MergeRule:
 class ConvertRule:
     def __init__(self, start, end):
         self.start = start
-        self.end = end
+        self.end = capped(end)
 
     def __call__(self, token):
         if token.is_a(self.start):
@@ -630,7 +629,6 @@ def token_search(tokens, searcher_factory):
             continue
         token_string = []
         searcher = searcher_factory()
-        searcher.factory = searcher_factory
         for j, token in enumerate(tokens.value[i:]):
             status = searcher(token)
             if status == TokenSearchStatus.FAIL:
@@ -669,6 +667,10 @@ def tagged(token, tags):
     def inner(*args):
         return token(*args, tags=tags)
     return inner
+
+
+def capped(token):
+    return tagged(token, [TokenExtraData.CAPPED])
     
 
 # CUSTOM CODE START
@@ -1030,14 +1032,13 @@ def main(code):
         if token.is_text():
             return
         rule, = args
-        for tag in token.tags:
-            if rule == tag:
-                return
+        if TokenExtraData.CAPPED in token.tags:
+            return
         match = next(token_search(token, rule), None)
         if match is None:
             return
-        replace_token_search_match(token, match,
-                                   match.searcher.result(match.tokens))
+        result = match.searcher.result(match.tokens)
+        replace_token_search_match(token, match, result)
         return True
 
     for transform_group in transform_groups:
@@ -1113,6 +1114,7 @@ def run(file):
 
 
 if __name__ == "__main__":
+    input()
     run("tuple.ll")
 
 
