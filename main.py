@@ -49,7 +49,9 @@ TokenType = Enum("TokenType", "TEXT", "TREE")
 TokenSearchStatus = Enum("TokenSearchStatus", "FAIL", "CONTINUE", "FINISH",
                          "TERMINATE")
 TokenVisitMode = Enum("TokenVisitMode", "DEPTH")
-TokenExtraData = Enum("TokenExtraData", "CAPPED")
+# TokenExtraData.UNIT specifies that the token should be treated as a
+# single unit
+TokenExtraData = Enum("TokenExtraData", "CAPPED", "UNIT")
 BasicType = Enum("BasicType", "int", "float", "bool", "str", "func", "none",
                  "tuple")
 TAB = "    "
@@ -342,7 +344,6 @@ class Scope:
 
 
 class Block(Node):
-
     def startBLOCK(self):
         self.scope = Scope(self)
 
@@ -596,7 +597,6 @@ def replace_token_search_match(original, match, new):
 
 
 class TokenSearchMatch:  # Make into data class
-
     def __init__(self, start, end, tokens, searcher):
         self.start = start
         self.end = end
@@ -963,15 +963,15 @@ def main(code):
         name = next(token_search(code, NameSearch), None)
         if name is None:
             break
-        replace_token_search_match(code, name, [Name(name.tokens)])
+        replace_token_search_match(code, name, [
+            tagged(Name, [TokenExtraData.UNIT])(name.tokens)
+        ])
 
     print("Starting ast formation...")
 
     transform_groups = [
         [lambda: RemoveRule([Whitespace])],
         [
-            # TODO: make it only affect entire "name" tokens instead of fixing
-            # inside strings
             lambda: SetRule(list(BasicType), TypeToken),
             lambda: CollapseRule(Name, (TypeToken,))
         ],
@@ -1040,6 +1040,9 @@ def main(code):
         match = next(token_search(token, rule), None)
         if match is None:
             return
+        if TokenExtraData.UNIT in token.tags:
+            if match.start != 0 or match.end < len(token.value) - 1:
+                return
         result = match.searcher.result(match.tokens)
         replace_token_search_match(token, match, result)
         return True
@@ -1115,7 +1118,7 @@ def run(file):
 
 
 if __name__ == "__main__":
-    run("scope.ll")
+    run("argument.ll")
 
 
 # Cool regex:
