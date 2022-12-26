@@ -52,8 +52,9 @@ TokenVisitMode = Enum("TokenVisitMode", "DEPTH")
 # TokenExtraData.UNIT specifies that the token should be treated as a
 # single unit
 TokenExtraData = Enum("TokenExtraData", "CAPPED", "UNIT")
+# Currently unused: int, bool
 BasicType = Enum("BasicType", "int", "float", "bool", "str", "func", "none",
-                 "tuple")
+                 "tuple", "array")
 TAB = "    "
 
 
@@ -711,6 +712,14 @@ class GroupClose(Symbolic):
     pass
 
 
+class ArrayOpen(Symbolic):
+    pass
+
+
+class ArrayClose(Symbolic):
+    pass
+
+
 class Comma(Symbolic):
     pass
 
@@ -750,6 +759,18 @@ class Tuple(Operand):
 
 
 class UnfinishedTuple(Tuple):
+    pass
+
+
+class Array(Operand):
+    def _compute_type(self):
+        elem = self.value[0].type_()
+        if elem.type_ == BasicType.none:
+            return Type.none
+        return Type(BasicType.array, [elem])
+
+
+class UnfinishedArray(Array):
     pass
 
 
@@ -946,6 +967,8 @@ def main(code):
         create_text_conversion("\n", Newline),
         create_text_conversion(",", Comma),
         create_text_conversion(":", Typer),
+        create_text_conversion("[", ArrayOpen),
+        create_text_conversion("]", ArrayClose),
     ])
 
     print("Starting number search...")
@@ -987,6 +1010,41 @@ def main(code):
                               (0, 2), Subtraction),
             lambda: GroupRule([Operand, AdditionOperator, Operand],
                               (0, 2), Addition),
+
+            # Arrays
+            lambda: MergeRule(
+                [UnfinishedArray, Operand, Comma],
+                0, (1,), UnfinishedArray
+            ),
+            lambda: GroupRule(
+                [ArrayOpen, Operand, Comma, Operand, Comma],
+                (1, 3), UnfinishedArray
+            ),
+            lambda: GroupRule(
+                [ArrayOpen, Operand, Comma, Operand, ArrayClose],
+                (1, 3), Array
+            ),
+            lambda: GroupRule([ArrayOpen, Operand, ArrayClose],
+                              (1,), Array),
+            lambda: MergeRule(
+                [UnfinishedArray, Operand, ArrayClose], 0,
+                (1,), Array
+            ),
+            
+            # Tuples
+            lambda: MergeRule([UnfinishedTuple, Operand, Comma], 0,
+                              (1, ), UnfinishedTuple),
+            lambda: GroupRule([Operand, Comma, Operand, Comma],
+                              (0, 2), UnfinishedTuple),
+            lambda: GroupRule([Operand, Comma, Operand],
+                              (0, 2), Tuple),
+            lambda: GroupRule([Operand, Comma],
+                              (0, ), Tuple),
+            lambda: MergeRule([UnfinishedTuple, Operand], 0, (1, ), Tuple),
+            
+            lambda: GroupRule([Operand, Tuple], (0, 1), FunctionCall),
+            lambda: GroupRule([Operand, Group], (0, 1), FunctionCall),
+            
             lambda: GroupRule([Variable, AssignOperator, Operand],
                               (0, 2), Assignment),
             lambda: GroupRule([ReturnOperator, Operand],
@@ -996,6 +1054,7 @@ def main(code):
             lambda: GroupRule([Arguments, Function], (0, 1),
                               ArgumentFunction),
 
+            # Argument lists
             lambda: MergeRule(
                 [UnfinishedArguments, Argument, Comma],
                 0, (1,), UnfinishedArguments
@@ -1014,20 +1073,6 @@ def main(code):
                 [UnfinishedArguments, Argument, GroupClose], 0,
                 (1,), Arguments
             ),
-            
-            # Hardcode for tuples of length 2 or less
-            lambda: MergeRule([UnfinishedTuple, Operand, Comma], 0,
-                              (1, ), UnfinishedTuple),
-            lambda: GroupRule([Operand, Comma, Operand, Comma],
-                              (0, 2), UnfinishedTuple),
-            lambda: GroupRule([Operand, Comma, Operand],
-                              (0, 2), Tuple),
-            lambda: GroupRule([Operand, Comma],
-                              (0, ), Tuple),
-            lambda: MergeRule([UnfinishedTuple, Operand], 0, (1, ), Tuple),
-            
-            lambda: GroupRule([Operand, Tuple], (0, 1), FunctionCall),
-            lambda: GroupRule([Operand, Group], (0, 1), FunctionCall),
         ]
     ]
 
@@ -1054,6 +1099,7 @@ def main(code):
             for rule in transform_group:
                 found_any = code.visit(transform_visit, (rule,))
                 if found_any:
+                    # print(code)
                     break
 
     code.ensure_parents()
@@ -1119,6 +1165,9 @@ def run(file):
 
 if __name__ == "__main__":
     run("argument.ll")
+    run("array.ll")
+    run("scope.ll")
+    run("tuple.ll")
 
 
 # Cool regex:
