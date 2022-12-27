@@ -44,6 +44,9 @@ class Enum:
                 return EnumValue(self, value)
         return value
 
+    def __getitem__(self, key):
+        return EnumValue(self, self.__dict__[key])
+
 
 TokenType = Enum("TokenType", "TEXT", "TREE")
 TokenSearchStatus = Enum("TokenSearchStatus", "FAIL", "CONTINUE", "FINISH",
@@ -216,8 +219,10 @@ class Token:
 
 
 class Instance:
-    def __init__(self):
-        self.type_ = Type.none
+    def __init__(self, type_=None):
+        if type_ is None:
+            type_ = Type.none
+        self.type_ = type_
 
     def __str__(self):
         return repr(self)
@@ -356,12 +361,12 @@ class Block(Node):
     INDENT = TAB
 
 
-class TypeToken(Operand):
-    pass
+class TypeToken(Node):
+    def to_type_(self):
+        return Type(BasicType[condense_tokens(self.value)])
 
 
 class TokenConversion:  # make into data class
-
     def __init__(self, find, replace):
         self.find = find
         self.replace = replace
@@ -1107,9 +1112,7 @@ def main(code):
     print("Starting type inference...")
 
     for name, value in constants:
-        instance = Instance()
-        instance.type_ = Type(python_to_type(value))
-        code.scope.assign(name, instance)
+        code.scope.assign(name, Instance(Type(python_to_type(value))))
 
     def assign_visit(token, args):
         if isinstance(token, Assignment):
@@ -1141,7 +1144,20 @@ def main(code):
         if isinstance(token, Operand):
             token.compute_type()
 
+    def arguments_visit(token, args):
+        if isinstance(token, ArgumentFunction):
+            arguments, function = token.value
+            for argument in arguments.value:
+                name, type_ = argument.value
+                print(repr(type_.to_type_()))
+                function.scope.assign(
+                    condense_tokens(name.value), 
+                    Instance(type_.to_type_())
+                )
+                
+
     found_any = True
+    code.visit(arguments_visit, tuple())
     while found_any:
         found_any = False
         code.visit(compute_visit, tuple())
