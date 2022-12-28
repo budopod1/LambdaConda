@@ -218,25 +218,15 @@ class Token:
         return None
 
 
-class Instance:
-    def __init__(self, type_=None):
-        if type_ is None:
-            type_ = Type.none
-        self.type_ = type_
-
-    def __str__(self):
-        return repr(self)
-
-    def __repr__(self):
-        return f"Instance<{self.type_}>"
-
-
 class Type:
     def __init__(self, type_, generics=None):
         self.type_ = type_
         if generics is None:
             generics = []
         self.generics = generics
+
+    def is_none(self):
+        return self.type_ == BasicType.none
 
     def __eq__(self, other):
         if other.type_ != self.type_:
@@ -306,20 +296,13 @@ class Symbolic(Token):  # Represents something temporary, but /w structure
 
 class Operand(Token):
     def startOPERAND(self):
-        self.instance = Instance()
-
-    def type_(self, value=None):
-        if value is not None:
-            if not isinstance(value, Type):
-                raise TypeError("Type must be Type")
-            self.instance.type_ = value
-        return self.instance.type_
+        self.type_ = Type.none
 
     def compute_type(self):
         type_ = self._compute_type()
         assert isinstance(type_, Type), "Type must be Type"
         if type_.type_ != BasicType.none:
-            self.type_(type_)
+            self.type_ = type_
         return type_
 
     def _compute_type(self):
@@ -757,7 +740,7 @@ class ReturnOperator(Operator):
 
 class Tuple(Operand):
     def _compute_type(self):
-        child_types = [child.type_() for child in self.value]
+        child_types = [child.type_ for child in self.value]
         if any([type_.type_ == BasicType.none for type_ in child_types]):
             return Type.none
         return Type(BasicType.tuple, child_types)
@@ -769,7 +752,7 @@ class UnfinishedTuple(Tuple):
 
 class Array(Operand):
     def _compute_type(self):
-        elem = self.value[0].type_()
+        elem = self.value[0].type_
         if elem.type_ == BasicType.none:
             return Type.none
         return Type(BasicType.array, [elem])
@@ -782,52 +765,52 @@ class UnfinishedArray(Array):
 class FunctionCall(Operand):
     def _compute_type(self):
         func, _ = self.value
-        func_type = func.type_()
+        func_type = func.type_
         if not func_type.generics:
             return Type.none
-        return func.type_().generics[0]
+        return func.type_.generics[0]
 
 
 class Assignment(Operand):
     def _compute_type(self):
         _, child = self.value
-        return child.type_()
+        return child.type_
 
 
 class Unpacking(Operand):
     def _compute_type(self):
         _, child = self.value
-        return child.type_()
+        return child.type_
 
 
 class Addition(Operand):
     def _compute_type(self):
         child, _ = self.value
-        return child.type_()
+        return child.type_
 
 
 class Subtraction(Operand):
     def _compute_type(self):
         child, _ = self.value
-        return child.type_()
+        return child.type_
 
 
 class Negation(Operand):
     def _compute_type(self):
         child, = self.value
-        return child.type_()
+        return child.type_
 
 
 class Group(Operand):
     def _compute_type(self):
         child, = self.value
-        return child.type_()
+        return child.type_
 
 
 class Return(Operand):
     def _compute_type(self):
         child, = self.value
-        return child.type_()
+        return child.type_
 
 
 
@@ -847,7 +830,7 @@ class Function(Operand, Block):
     def _compute_type(self):
         def return_visit(token, arguments):
             if token.is_a(Return):
-                return_type = token.type_()
+                return_type = token.type_
                 if return_type:
                     return return_type
                 else:
@@ -1154,32 +1137,32 @@ def main(code):
     print("Starting type inference...")
 
     for name, value in constants:
-        code.scope.assign(name, Instance(Type(python_to_type(value))))
+        code.scope.assign(name, Type(python_to_type(value)))
 
     def assign_visit(token, args):
         if isinstance(token, Assignment):
             name, value = token.value
-            type_ = value.type_()
+            type_ = value.type_
             if type_.type_ == BasicType.none:
                 return
             scope = token.search_parent(Block).scope
             name = condense_tokens(name.value)
             if scope.get(name) is not None:
                 return
-            changed = scope.assign(name, token.instance)
+            changed = scope.assign(name, type_)
             if changed:
                 return True
 
     def reference_visit(token, args):
         if isinstance(token, Refrence):
-            if token.type_().type_ != BasicType.none:
+            if token.type_.type_ != BasicType.none:
                 return
             name = condense_tokens(token.value)
             scope = token.search_parent(Block).scope
-            instance = scope.get(name)
-            if instance is None:  # type_.type_ == BasicType.none
+            type_ = scope.get(name)
+            if type_ is None or type_.is_none():
                 return
-            token.instance = instance
+            token.type_ = type_
             return True
 
     def compute_visit(token, args):
@@ -1193,9 +1176,26 @@ def main(code):
                 name, type_ = argument.value
                 function.scope.assign(
                     condense_tokens(name.value), 
-                    Instance(type_.to_type_())
+                    type_.to_type_()
                 )
-                
+
+    def unpack_visit(token, args): # unused currently
+        if isinstance(token, Unpacking):
+            values, tuple = token.value
+            tuple_type = tuple.type_
+            if tuple_type.is_none():
+                return
+            types = tuple_type.generics
+            scope = token.search_parent(Block).scope
+            changed_any = False
+            for value, type_ in zip(values, types):
+                name = condense_tokens(value.value)
+                if scope.get(name) is not None:
+                    continue
+                changed = scope.assign(name, type_)
+                if changed:
+                    changed_any = True
+            return changed_any
 
     found_any = True
     code.visit(arguments_visit, tuple())
