@@ -794,6 +794,12 @@ class Assignment(Operand):
         return child.type_()
 
 
+class Unpacking(Operand):
+    def _compute_type(self):
+        _, child = self.value
+        return child.type_()
+
+
 class Addition(Operand):
     def _compute_type(self):
         child, _ = self.value
@@ -822,6 +828,7 @@ class Return(Operand):
     def _compute_type(self):
         child, = self.value
         return child.type_()
+
 
 
 class Refrence(Operand):  # Anything that can be refrenced in code
@@ -957,6 +964,40 @@ def main(code):
         name = constants.add(condense_tokens(string.tokens))
         replace_token_search_match(code, string, [Constant(tokenify(name))])
 
+    print("Removing comments...")
+
+    # This is so spagehti code
+    last_char = None
+    multi_line_comment = False
+    one_line_comment = False
+    result = []
+    for token in code.value:
+        skip_this = False
+        if token.is_text():
+            char = token.value
+            if not multi_line_comment:
+                if char == "#":
+                    one_line_comment = True
+            if one_line_comment:
+                if char == "\n":
+                    one_line_comment = False
+                    skip_this = True
+            if not (multi_line_comment or one_line_comment):
+                if char == "*" and last_char == "/":
+                    result = result[-1:]
+                    multi_line_comment = True
+            if multi_line_comment:
+                if char == "/" and last_char == "*":
+                    multi_line_comment = False
+                    skip_this = True
+            last_char = char
+        else:
+            last_char = None
+        if not (multi_line_comment or one_line_comment or skip_this):
+            result.append(token)
+
+    code = Program(result)
+
     print("Started tokenizing...")
 
     perform_conversions(code, [
@@ -1008,6 +1049,7 @@ def main(code):
                 FunctionOpen, FunctionClose, Function, allow_text=True)
         ],
         [
+            lambda: ConvertRule(Name, Variable),
             lambda: GroupRule([GroupOpen, Operand, GroupClose], (1, ), Group),
             lambda: GroupRule([GroupOpen, GroupClose], tuple(), Tuple),
             lambda: GroupRule([MinusOperator, Operand], (1, ), Negation),
@@ -1052,10 +1094,11 @@ def main(code):
             
             lambda: GroupRule([Variable, AssignOperator, Operand],
                               (0, 2), Assignment),
+            lambda: GroupRule([Tuple, AssignOperator, Operand],
+                              (0, 2), Unpacking),
             lambda: GroupRule([ReturnOperator, Operand],
                             (1,), Return),
             lambda: GroupRule([Name, Typer, TypeToken], (0, 2), Argument),
-            lambda: ConvertRule(Name, Variable),
             lambda: GroupRule([Arguments, Function], (0, 1),
                               ArgumentFunction),
 
@@ -1104,7 +1147,6 @@ def main(code):
             for rule in transform_group:
                 found_any = code.visit(transform_visit, (rule,))
                 if found_any:
-                    # print(code)
                     break
 
     code.ensure_parents()
@@ -1149,7 +1191,6 @@ def main(code):
             arguments, function = token.value
             for argument in arguments.value:
                 name, type_ = argument.value
-                print(repr(type_.to_type_()))
                 function.scope.assign(
                     condense_tokens(name.value), 
                     Instance(type_.to_type_())
