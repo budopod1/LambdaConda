@@ -4,7 +4,7 @@ numbers = "1234567890"
 
 
 class EnumValue:
-    def __init__(self,enum, value):
+    def __init__(self, enum, value):
         self.enum = enum
         self.value = value
 
@@ -225,6 +225,9 @@ class Type:
             generics = []
         self.generics = generics
 
+    def with_generics(self, generics):
+        return Type(self.type_, generics)
+
     def is_none(self):
         return self.type_ == BasicType.none
 
@@ -342,11 +345,6 @@ class Block(Node):
     SEPERATOR = "\n"
     BORDER_SEP = True
     INDENT = TAB
-
-
-class TypeToken(Node):
-    def to_type_(self):
-        return Type(BasicType[condense_tokens(self.value)])
 
 
 class TokenConversion:  # make into data class
@@ -746,7 +744,7 @@ class Tuple(Operand):
         return Type(BasicType.tuple, child_types)
 
 
-class UnfinishedTuple(Tuple):
+class UnfinishedTuple(Node):
     pass
 
 
@@ -758,7 +756,7 @@ class Array(Operand):
         return Type(BasicType.array, [elem])
 
 
-class UnfinishedArray(Array):
+class UnfinishedArray(Node):
     pass
 
 
@@ -847,6 +845,37 @@ class Function(Operand, Block):
         return Type(BasicType.func, [Type.none])
 
 
+
+class TypeToken(Node):
+    def to_type(self):
+        return Type(BasicType[condense_tokens(self.value)])
+
+
+class GenericOpen(Symbolic):
+    pass
+
+
+class GenericClose(Symbolic):
+    pass
+
+
+class GenericList(Node):
+    pass
+
+
+class UnfinishedGenericList(Node):
+    pass
+
+
+class GenericTypeToken(TypeToken):
+    def to_type(self):
+        basic_type, generics = self.value
+        return basic_type.to_type().with_generics([
+            generic.to_type()
+            for generic in generics.value
+        ])
+
+
 class ArgumentFunction(Function):
     pass
 
@@ -859,7 +888,7 @@ class Arguments(Node):
     pass
 
 
-class UnfinishedArguments(Arguments):
+class UnfinishedArguments(Node):
     pass
 
 
@@ -964,10 +993,9 @@ def main(code):
             if one_line_comment:
                 if char == "\n":
                     one_line_comment = False
-                    skip_this = True
             if not (multi_line_comment or one_line_comment):
                 if char == "*" and last_char == "/":
-                    result = result[-1:]
+                    result = result[:-1]
                     multi_line_comment = True
             if multi_line_comment:
                 if char == "/" and last_char == "*":
@@ -998,16 +1026,9 @@ def main(code):
         create_text_conversion(":", Typer),
         create_text_conversion("[", ArrayOpen),
         create_text_conversion("]", ArrayClose),
+        create_text_conversion("<", GenericOpen),
+        create_text_conversion(">", GenericClose),
     ])
-
-    print("Starting number search...")
-
-    while True:
-        number = next(token_search(code, NumberSearch), None)
-        if number is None:
-            break
-        name = constants.add(float(condense_tokens(number.tokens)))
-        replace_token_search_match(code, number, [Constant(tokenify(name))])
 
     print("Starting name search...")
 
@@ -1018,6 +1039,15 @@ def main(code):
         replace_token_search_match(code, name, [
             tagged(Name, [TokenExtraData.UNIT])(name.tokens)
         ])
+
+    print("Starting number search...")
+
+    while True:
+        number = next(token_search(code, NumberSearch), None)
+        if number is None:
+            break
+        name = constants.add(float(condense_tokens(number.tokens)))
+        replace_token_search_match(code, number, [Constant(tokenify(name))])
 
     print("Starting ast formation...")
 
@@ -1032,7 +1062,52 @@ def main(code):
                 FunctionOpen, FunctionClose, Function, allow_text=True)
         ],
         [
+            # Generics
+            lambda: MergeRule(
+                [UnfinishedGenericList, TypeToken, Comma],
+                0, (1,), UnfinishedGenericList
+            ),
+            lambda: GroupRule(
+                [GenericOpen, TypeToken, Comma, TypeToken, Comma],
+                (1, 3), UnfinishedGenericList
+            ),
+            lambda: GroupRule(
+                [GenericOpen, TypeToken, Comma, TypeToken, GenericClose],
+                (1, 3), GenericList
+            ),
+            lambda: GroupRule([GenericOpen, TypeToken, GenericClose],
+                              (1,), GenericList),
+            lambda: MergeRule(
+                [UnfinishedGenericList, TypeToken, GenericClose], 0,
+                (1,), GenericList
+            ),
+            
+            lambda: GroupRule([TypeToken, GenericList], (0, 1), GenericTypeToken),
+            lambda: GroupRule([Name, Typer, TypeToken], (0, 2), Argument),
+            
+            # Argument lists
+            lambda: MergeRule(
+                [UnfinishedArguments, Argument, Comma],
+                0, (1,), UnfinishedArguments
+            ),
+            lambda: GroupRule(
+                [GroupOpen, Argument, Comma, Argument, Comma],
+                (1, 3), UnfinishedArguments
+            ),
+            lambda: GroupRule(
+                [GroupOpen, Argument, Comma, Argument, GroupClose],
+                (1, 3), Arguments
+            ),
+            lambda: GroupRule([GroupOpen, Argument, GroupClose],
+                              (1,), Arguments),
+            lambda: MergeRule(
+                [UnfinishedArguments, Argument, GroupClose], 0,
+                (1,), Arguments
+            ),
+        ],
+        [
             lambda: ConvertRule(Name, Variable),
+            
             lambda: GroupRule([GroupOpen, Operand, GroupClose], (1, ), Group),
             lambda: GroupRule([GroupOpen, GroupClose], tuple(), Tuple),
             lambda: GroupRule([MinusOperator, Operand], (1, ), Negation),
@@ -1081,29 +1156,8 @@ def main(code):
                               (0, 2), Unpacking),
             lambda: GroupRule([ReturnOperator, Operand],
                             (1,), Return),
-            lambda: GroupRule([Name, Typer, TypeToken], (0, 2), Argument),
             lambda: GroupRule([Arguments, Function], (0, 1),
                               ArgumentFunction),
-
-            # Argument lists
-            lambda: MergeRule(
-                [UnfinishedArguments, Argument, Comma],
-                0, (1,), UnfinishedArguments
-            ),
-            lambda: GroupRule(
-                [GroupOpen, Argument, Comma, Argument, Comma],
-                (1, 3), UnfinishedArguments
-            ),
-            lambda: GroupRule(
-                [GroupOpen, Argument, Comma, Argument, GroupClose],
-                (1, 3), Arguments
-            ),
-            lambda: GroupRule([GroupOpen, Argument, GroupClose],
-                              (1,), Arguments),
-            lambda: MergeRule(
-                [UnfinishedArguments, Argument, GroupClose], 0,
-                (1,), Arguments
-            ),
         ]
     ]
 
@@ -1176,7 +1230,7 @@ def main(code):
                 name, type_ = argument.value
                 function.scope.assign(
                     condense_tokens(name.value), 
-                    type_.to_type_()
+                    type_.to_type()
                 )
 
     def unpack_visit(token, args): # unused currently
