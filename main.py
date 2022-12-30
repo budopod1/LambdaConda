@@ -1237,7 +1237,7 @@ def main(code):
         if isinstance(token, Unpacking):
             values, tuple = token.value
             tuple_type = tuple.type_
-            if tuple_type.is_none():
+            if tuple_type.type_ != BasicType.tuple:
                 return
             scope = token.search_parent(Block).scope
             changed_any = False
