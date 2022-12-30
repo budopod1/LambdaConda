@@ -1233,16 +1233,15 @@ def main(code):
                     type_.to_type()
                 )
 
-    def unpack_visit(token, args): # unused currently
+    def unpack_visit(token, args):
         if isinstance(token, Unpacking):
             values, tuple = token.value
             tuple_type = tuple.type_
             if tuple_type.is_none():
                 return
-            types = tuple_type.generics
             scope = token.search_parent(Block).scope
             changed_any = False
-            for value, type_ in zip(values, types):
+            for value, type_ in zip(values.value, tuple_type.generics):
                 name = condense_tokens(value.value)
                 if scope.get(name) is not None:
                     continue
@@ -1257,6 +1256,9 @@ def main(code):
         found_any = False
         code.visit(compute_visit, tuple())
         found_any = code.visit(assign_visit, tuple())
+        if found_any:
+            continue
+        found_any = code.visit(unpack_visit, tuple())
         if found_any:
             continue
         found_any = code.visit(reference_visit, tuple())
