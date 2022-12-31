@@ -728,6 +728,10 @@ class AdditionOperator(Operator):
     pass
 
 
+class Instantiater(Operator):
+    pass
+
+
 class MinusOperator(Operator):  # Could be subtraction or negation
     pass
 
@@ -767,6 +771,12 @@ class FunctionCall(Operand):
         if not func_type.generics:
             return Type.none
         return func.type_.generics[0]
+
+
+class Instantiation(Operand):
+    def _compute_type(self):
+        child, = self.value
+        return child.to_type()
 
 
 class Assignment(Operand):
@@ -1028,6 +1038,7 @@ def main(code):
         create_text_conversion("]", ArrayClose),
         create_text_conversion("<", GenericOpen),
         create_text_conversion(">", GenericClose),
+        create_text_conversion("new", Instantiater),
     ])
 
     print("Starting name search...")
@@ -1115,6 +1126,7 @@ def main(code):
                               (0, 2), Subtraction),
             lambda: GroupRule([Operand, AdditionOperator, Operand],
                               (0, 2), Addition),
+            lambda: GroupRule([Instantiater, TypeToken], (1,), Instantiation),
 
             # Arrays
             lambda: MergeRule(
