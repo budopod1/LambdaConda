@@ -1,4 +1,6 @@
 from pyenum import Enum
+from id_ import IDGetter
+from instructions import make_instruction, make_constant, FunctionInstruction, AssignInstruction, InstantiationInstruction, VariableInstruction, UnpackInstruction, FunctionCallInstruction, AdditionInstruction, TupleInstruction, ArrayInstruction, NegationInstruction, ReturnInstruction
 
 
 alphabet = "qwertyuiopasdfghjklzxcvbnm"
@@ -153,12 +155,13 @@ class Token:
 
     def string_data(self):
         return {}
+        # {"type": self.type_ if isinstance(self, Operand) else None}
 
     def __str__(self):
         return self.stringify()
 
     def __repr__(self):
-        return repr(str(self))
+        return repr(str(self)) if self.is_text() else str(self)
 
     def visit(self, visitor, arguments, allowed=None, mode=None):
         if mode is None:  # unused currently
@@ -207,6 +210,9 @@ class Type:
     def __str__(self):
         generics = [str(generic) for generic in self.generics]
         return f"{self.type_}<{', '.join(generics)}>"
+
+    def __repr__(self):
+        return str(self)
 
 
 Type.none = Type(BasicType.none)
@@ -263,10 +269,13 @@ class Operand(Token):
 
     def compute_type(self):
         type_ = self._compute_type()
+        if type_ == self.type_:
+            return False
         assert isinstance(type_, Type), "Type must be Type"
         if not type_.is_none():
             self.type_ = type_
-        return type_
+            return True
+        return False
 
     def _compute_type(self):
         return Type.none
@@ -301,6 +310,13 @@ class Block(Node):
     def string_data(self):
         return self.scope.scope
 
+    def instruction(self):
+        return make_instruction(
+            FunctionInstruction,
+            self.value,
+            self.type_ if isinstance(self, Operand) else None
+        )
+
     SEPERATOR = "\n"
     BORDER_SEP = True
     INDENT = TAB
@@ -312,17 +328,7 @@ class TokenConversion:  # make into data class
         self.replace = replace
 
 
-class VarID:
-    def __init__(self):
-        self.id_ = 0
-
-    def __call__(self):
-        id_ = self.id_
-        self.id_ += 1
-        return id_
-
-
-var_id = VarID()
+var_id = IDGetter()
 
 
 class Constants:
@@ -335,6 +341,9 @@ class Constants:
         name = f"_CONST{self._id}"
         self.constants[name] = value
         return name
+
+    def get(self, name):
+        return self.constants[name]
 
     def __iter__(self):
         return (v for v in self.constants.items())
@@ -635,11 +644,12 @@ def capped(token):
     return tagged(token, [TokenExtraData.CAPPED])
     
 
-# CUSTOM CODE START
+# ------------------------ #
 
 
 class Program(Block):
-    pass
+    def startPROGRAM(self):
+        self.constants = None
 
 
 class Whitespace(Symbolic):
@@ -716,8 +726,16 @@ class Tuple(Operand):
     def _compute_type(self):
         child_types = [child.type_ for child in self.value]
         if any([type_.is_none() for type_ in child_types]):
+            print(child_types)
             return Type.none
         return Type(BasicType.tuple, child_types)
+
+    def instruction(self):
+        return make_instruction(
+            TupleInstruction,
+            self.value,
+            self.type_
+        )
 
 
 class UnfinishedTuple(Node):
@@ -730,6 +748,13 @@ class Array(Operand):
         if elem.is_none():
             return Type.none
         return Type(BasicType.array, [elem])
+
+    def instruction(self):
+        return make_instruction(
+            ArrayInstruction,
+            self.value,
+            self.type_
+        )
 
 
 class UnfinishedArray(Node):
@@ -744,11 +769,25 @@ class FunctionCall(Operand):
             return Type.none
         return func.type_.generics[0]
 
+    def instruction(self):
+        return make_instruction(
+            FunctionCallInstruction,
+            self.value,
+            self.type_
+        )
+
 
 class Instantiation(Operand):
     def _compute_type(self):
         child, = self.value
         return child.to_type()
+
+    def instruction(self):
+        return make_instruction(
+            InstantiationInstruction,
+            [],
+            self.type_
+        )
 
 
 class Assignment(Operand):
@@ -756,17 +795,45 @@ class Assignment(Operand):
         _, child = self.value
         return child.type_
 
+    def instruction(self):
+        target, value = self.value
+        return make_instruction(
+            AssignInstruction,
+            [value],
+            self.type_,
+            {"var_id": target.id_}
+        )
+
 
 class Unpacking(Operand):
     def _compute_type(self):
         _, child = self.value
         return child.type_
 
+    def instruction(self):
+        targets, value = self.value
+        return make_instruction(
+            UnpackInstruction,
+            [value],
+            self.type_,
+            {"var_ids": [
+                target.id_
+                for target in targets.value
+            ]}
+        )
+
 
 class Addition(Operand):
     def _compute_type(self):
         child, _ = self.value
         return child.type_
+
+    def instruction(self):
+        return make_instruction(
+            AdditionInstruction,
+            self.value,
+            self.type_
+        )
 
 
 class Subtraction(Operand):
@@ -780,17 +847,35 @@ class Negation(Operand):
         child, = self.value
         return child.type_
 
+    def instruction(self):
+        return make_instruction(
+            NegationInstruction,
+            self.value,
+            self.type_
+        )
+
 
 class Group(Operand):
     def _compute_type(self):
         child, = self.value
         return child.type_
 
+    def instruction(self):
+        child, = self.value
+        return child.instruction()
+
 
 class Return(Operand):
     def _compute_type(self):
         child, = self.value
         return child.type_
+
+    def instruction(self):
+        return make_instruction(
+            ReturnInstruction,
+            self.value,
+            self.type_
+        )
 
 
 class Refrence(Operand):  # Anything that can be refrenced in code
@@ -804,13 +889,38 @@ class Variable(Refrence):
     def string_data(self):
         return {"id_": self.id_}
 
+    def instruction(self):
+        return make_instruction(
+            VariableInstruction,
+            [],
+            self.type_,
+            {"var_id": self.id_}
+        )
+
 
 class Constant(Refrence):
-    pass
+    def instruction(self):
+        name = condense_tokens(self.value)
+        return make_constant(
+            self.type_,
+            self.search_parent(Program).constants.get(name)
+        )
 
 
-class RefrenceWrapper(Refrence): # A wrapped for putting things in scopes
-    pass
+class RefrenceWrapper: # A object linking refrences in the AST
+    def __init__(self, object):
+        if isinstance(object, Type):
+            self.type_ = object
+            self.id_ = None
+        else:
+            self.type_ = object.type_
+            self.id_ = object.id_ if isinstance(object, Variable) else None
+
+    def __str__(self):
+        return repr(self) # str(self.type_)
+
+    def __repr__(self):
+        return f"RefrenceWrapper<{self.type_}>"
 
 
 class Function(Operand, Block):
@@ -865,8 +975,30 @@ class GenericTypeToken(TypeToken):
         ])
 
 
-class ArgumentFunction(Function):
-    pass
+class ArgumentFunction(Operand):
+    def _compute_type(self):
+        args, func = self.value
+        if func.type_.is_none():
+            return Type.none
+        return_value, = func.type_.generics
+        return func.type_.with_generics(
+            [
+                return_value,
+                *[
+                    generic.value[1].to_type()
+                    for generic in args.value
+                ]
+            ]
+        )
+    
+    def instruction(self):
+        args, func = self.value
+        return make_instruction(
+            FunctionInstruction,
+            func.value,
+            self.type_,
+            {"arguments": args.value}
+        )
 
 
 class Argument(Node):
@@ -997,6 +1129,7 @@ def parse(code):
             result.append(token)
 
     code = Program(result)
+    code.constants = constants
 
     print("Started tokenizing...")
 
@@ -1182,8 +1315,7 @@ def parse(code):
     print("Starting type inference...")
 
     for name, value in constants:
-        constant = RefrenceWrapper([])
-        constant.type_ = Type(python_to_type(value))
+        constant = RefrenceWrapper(Type(python_to_type(value)))
         code.scope.assign(name, constant)
 
     def assign_visit(token, args):
@@ -1196,7 +1328,7 @@ def parse(code):
             name = condense_tokens(name.value)
             if scope.get(name) is not None:
                 return
-            changed = scope.assign(name, token)
+            changed = scope.assign(name, RefrenceWrapper(token))
             if changed:
                 return True
 
@@ -1213,21 +1345,23 @@ def parse(code):
             if type_ is None or type_.is_none():
                 return
             token.type_ = type_
-            if isinstance(source, Variable):
+            if source.id_ is not None:
                 token.id_ = source.id_
             return True
 
     def compute_visit(token, args):
         if isinstance(token, Operand):
-            token.compute_type()
+            if not token.type_.is_none():
+                return
+            changed = token.compute_type()
+            return changed
 
     def arguments_visit(token, args):
         if isinstance(token, ArgumentFunction):
             arguments, function = token.value
             for argument in arguments.value:
                 name, type_ = argument.value
-                refrence = RefrenceWrapper([])
-                refrence.type_ = type_.to_type()
+                refrence = RefrenceWrapper(type_.to_type())
                 function.scope.assign(
                     condense_tokens(name.value), 
                     refrence
@@ -1245,9 +1379,9 @@ def parse(code):
                 name = condense_tokens(value.value)
                 if scope.get(name) is not None:
                     continue
-                changed = scope.assign(name, value)
+                changed = scope.assign(name, RefrenceWrapper(value))
                 if changed:
-                    changed_any = True
+                    changed_any |= True
             return changed_any
 
     def variable_visit(token, args):
@@ -1257,9 +1391,11 @@ def parse(code):
     found_any = True
     code.visit(arguments_visit, tuple())
     code.visit(variable_visit, tuple())
-    while found_any:
+    while True:
         found_any = False
-        code.visit(compute_visit, tuple())
+        found_any = code.visit(compute_visit, tuple())
+        if found_any:
+            continue
         found_any = code.visit(assign_visit, tuple())
         if found_any:
             continue

@@ -1,0 +1,1 @@
+Assignment(Variable(did_3), Group(Tuple(Constant(_CONST6typeBasicType.float), Constant(_CONST7typeBasicType.float), Constant(_CONST8typeBasicType.float), Constant(_CONST9typeBasicType.float)typeBasicType.tupleBasicType.float, BasicType.float, BasicType.float, BasicType.float)typeBasicType.none)typeBasicType.none
