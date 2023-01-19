@@ -192,6 +192,14 @@ class AdditionInstruction(Instruction):
     # (eg AdditonInstruction, ConcatinationInstruction, JoinInstruction)
 
 
+class ConcatenationInstruction(Instruction):
+    pass
+
+
+class JoinInstruction(Instruction):
+    pass
+
+
 class NegationInstruction(Instruction):
     pass
 

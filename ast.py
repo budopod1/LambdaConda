@@ -1,6 +1,6 @@
 from pyenum import Enum
 from id_ import IDGetter
-from instructions import make_instruction, make_constant, FunctionInstruction, AssignInstruction, InstantiationInstruction, VariableInstruction, UnpackInstruction, FunctionCallInstruction, AdditionInstruction, TupleInstruction, ArrayInstruction, NegationInstruction, ReturnInstruction
+from instructions import make_instruction, make_constant, FunctionInstruction, AssignInstruction, InstantiationInstruction, VariableInstruction, UnpackInstruction, FunctionCallInstruction, AdditionInstruction, TupleInstruction, ArrayInstruction, NegationInstruction, ReturnInstruction, ConcatenationInstruction, JoinInstruction
 
 
 alphabet = "qwertyuiopasdfghjklzxcvbnm"
@@ -726,7 +726,6 @@ class Tuple(Operand):
     def _compute_type(self):
         child_types = [child.type_ for child in self.value]
         if any([type_.is_none() for type_ in child_types]):
-            print(child_types)
             return Type.none
         return Type(BasicType.tuple, child_types)
 
@@ -829,8 +828,16 @@ class Addition(Operand):
         return child.type_
 
     def instruction(self):
+        instruction = None
+        basic_type = self.type_.type_ 
+        if basic_type == BasicType.float:
+            instruction = AdditionInstruction
+        elif basic_type == BasicType.str:
+            instruction = ConcatenationInstruction
+        elif basic_type == BasicType.array:
+            instruction = JoinInstruction
         return make_instruction(
-            AdditionInstruction,
+            instruction,
             self.value,
             self.type_
         )

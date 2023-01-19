@@ -13,7 +13,7 @@ def run(file):
 
 
 if __name__ == "__main__":
-    # run("examples/argument.ll")
-    # run("examples/array.ll")
-    # run("examples/scope.ll")
+    run("examples/argument.ll")
+    run("examples/array.ll")
+    run("examples/scope.ll")
     run("examples/tuple.ll")
