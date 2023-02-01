@@ -41,3 +41,6 @@ class Enum:
 
     def __getitem__(self, key):
         return EnumValue(self, self.__dict__[key])
+
+    def has(self, value):
+        return isinstance(value, EnumValue) and value.enum == self

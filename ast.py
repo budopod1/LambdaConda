@@ -1,6 +1,8 @@
 from pyenum import Enum
 from id_ import IDGetter
-from instructions import make_instruction, make_constant, FunctionInstruction, AssignInstruction, InstantiationInstruction, VariableInstruction, UnpackInstruction, FunctionCallInstruction, AdditionInstruction, TupleInstruction, ArrayInstruction, NegationInstruction, ReturnInstruction, ConcatenationInstruction, JoinInstruction
+from instructions import make_instruction, FunctionInstruction, AssignInstruction, InstantiationInstruction, VariableInstruction, UnpackInstruction, FunctionCallInstruction, AdditionInstruction, TupleInstruction, ArrayInstruction, NegationInstruction, ReturnInstruction, ConcatenationInstruction, JoinInstruction, ConstantInstruction
+from type_ import BasicType, Type
+from builtins_ import BUILTINS
 
 
 alphabet = "qwertyuiopasdfghjklzxcvbnm"
@@ -16,8 +18,6 @@ TokenVisitMode = Enum("TokenVisitMode", "DEPTH")
 # single unit
 TokenExtraData = Enum("TokenExtraData", "CAPPED", "UNIT")
 # Currently unused: int, bool
-BasicType = Enum("BasicType", "int", "float", "bool", "str", "func", "none",
-                 "tuple", "array")
 TAB = "    "
 
 
@@ -181,43 +181,6 @@ class Token:
         return None
 
 
-class Type:
-    def __init__(self, type_, generics=None):
-        self.type_ = type_
-        if generics is None:
-            generics = []
-        self.generics = generics
-
-    def with_generics(self, generics):
-        return Type(self.type_, generics)
-
-    def is_none(self):
-        return self.type_ == BasicType.none
-
-    def __eq__(self, other):
-        if other.type_ != self.type_:
-            return False
-        if len(self.generics) != len(other.generics):
-            return False
-        for a, b in zip(self.generics, other.generics):
-            if a != b:
-                return False
-        return True
-
-    def __ne__(self, other):
-        return not (self == other)
-
-    def __str__(self):
-        generics = [str(generic) for generic in self.generics]
-        return f"{self.type_}<{', '.join(generics)}>"
-
-    def __repr__(self):
-        return str(self)
-
-
-Type.none = Type(BasicType.none)
-
-
 class TokenMatch:
     def __init__(self, token_type, value):
         self.token_type = token_type
@@ -338,9 +301,12 @@ class Constants:
 
     def add(self, value):
         self._id += 1
-        name = f"_CONST{self._id}"
+        name = f"$CONST{self._id}"
         self.constants[name] = value
         return name
+
+    def contains(self, key):
+        return key in self.constants
 
     def get(self, name):
         return self.constants[name]
@@ -908,20 +874,18 @@ class Variable(Refrence):
 class Constant(Refrence):
     def instruction(self):
         name = condense_tokens(self.value)
-        return make_constant(
+        return make_instruction(
+            ConstantInstruction,
+            [],
             self.type_,
-            self.search_parent(Program).constants.get(name)
+            {"value": self.search_parent(Program).constants.get(name)}
         )
 
 
 class RefrenceWrapper: # A object linking refrences in the AST
-    def __init__(self, object):
-        if isinstance(object, Type):
-            self.type_ = object
-            self.id_ = None
-        else:
-            self.type_ = object.type_
-            self.id_ = object.id_ if isinstance(object, Variable) else None
+    def __init__(self, type_, id_=None):
+        self.type_ = type_
+        self.id_ = id_
 
     def __str__(self):
         return repr(self) # str(self.type_)
@@ -1322,7 +1286,11 @@ def parse(code):
     print("Starting type inference...")
 
     for name, value in constants:
-        constant = RefrenceWrapper(Type(python_to_type(value)))
+        constant = RefrenceWrapper(Type(python_to_type(value)), var_id())
+        code.scope.assign(name, constant)
+    
+    for name, type_ in BUILTINS.items():
+        constant = RefrenceWrapper(type_, var_id())
         code.scope.assign(name, constant)
 
     def assign_visit(token, args):
@@ -1332,10 +1300,12 @@ def parse(code):
             if type_.is_none():
                 return
             scope = token.search_parent(Block).scope
-            name = condense_tokens(name.value)
-            if scope.get(name) is not None:
+            target = condense_tokens(name.value)
+            if scope.get(target) is not None:
                 return
-            changed = scope.assign(name, RefrenceWrapper(token))
+            changed = scope.assign(
+                target, RefrenceWrapper(value.type_, name.id_)
+            )
             if changed:
                 return True
 
@@ -1414,7 +1384,7 @@ def parse(code):
             continue
         break
 
-    return code, constants
+    return code
 
 
 # Cool regex:

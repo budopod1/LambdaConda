@@ -1,13 +1,7 @@
 from id_ import IDGetter
-
-
-def make_constant(constant_type, value):
-    return FloatingInstruction(
-        ConstantInstruction,
-        [],
-        constant_type,
-        {"value": value}
-    )
+from interpreter import SpecialInstruction, SpecialInstructionType
+from type_ import Type, BasicType
+from builtins_ import BUILTINS
 
 
 def make_instruction(instruction_type, children, type_, extra=None):
@@ -37,20 +31,20 @@ def is_instruction(x):
 
 class Executable:
     def __init__(self):
-        self.functions = []
-        self.constants = {}
+        self.functions = {}
+        self.builtins = {}
 
     def add_function(self, name):
         function = Function(name, self)
-        self.functions.append(function)
+        self.functions[name] = function
         return function
 
-    def add_constant(self, id_, value):
-        self.constants[id_] = value
+    def get_function(self, name):
+        return self.functions[name]
 
     def __str__(self):
         return "\n".join(
-            [str(function) for function in self.functions]
+            [str(function) for function in self.functions.values()]
         )
 
     def __repr__(self):
@@ -66,17 +60,23 @@ class Function:
         self.executable = executable
         self.instructions = []
 
+    def __iter__(self):
+        return (
+            instruction 
+            for instruction in self.instructions
+        )
+
     def append(self, instruction):
         self.instructions.append(instruction)
 
     def add_instruction(self, instruction):
         instruction, params, type_, data = instruction
-        instruction = instruction(params, type_, self, **data)
+        instruction = instruction(params, type_, self, data, **data)
         self.instructions.append(instruction)
         return instruction
 
     def __str__(self):
-        text = "Function:\n"
+        text = f"Function {self.name}:\n"
         for instruction in self.instructions:
             text += "\t" + str(instruction) + "\n"
         return text
@@ -102,7 +102,8 @@ class FloatingInstruction:  # dataclass?
 
 
 class Instruction:
-    def __init__(self, params, type_, function):
+    def __init__(self, params, type_, function, extra):
+        self.extra = extra
         self.id_ = value_id()
         self.type_ = type_
         self.params = params
@@ -125,7 +126,8 @@ class Instruction:
     def __str__(self):
         name = type(self).__name__
         params = ", ".join([str(param) for param in self.params])
-        return f"{self.id_}: {name}<{self.type_}>({params})"
+        extra = "|" + str(self.extra) if self.extra else ""
+        return f"{self.id_}: {name}<{self.type_}>({params}{extra})"
 
     def __repr__(self):
         return str(self)
@@ -135,18 +137,19 @@ class ConstantInstruction(Instruction):
     def __init__(self, *args, value):
         self.value = value
         super().__init__(*args)
-    
-    def setup(self):
-        self.function.executable.add_constant(
-            self.id_,
-            self.value
-        )
+
+    def interpret(self, scope):
+        return self.value
 
 
 class AssignInstruction(Instruction):
     def __init__(self, *args, var_id):
         self.var_id = var_id
         super().__init__(*args)
+
+    def interpret(self, scope, value):
+        scope[self.var_id] = value
+        return value
 
 
 # class RefrencerInstruction
@@ -156,6 +159,11 @@ class VariableInstruction(Instruction):
     def __init__(self, *args, var_id):
         super().__init__(*args)
         self.var_id = var_id
+
+    def interpret(self, scope):
+        if scope.is_builtin(self.var_id):
+            return scope.get_builtin(self.var_id)
+        return scope[self.var_id]
 
 
 class InstantiationInstruction(Instruction):
@@ -175,6 +183,9 @@ class FunctionInstruction(Instruction):
         self.old_function = self.function
         self.function = executable.add_function(self.id_)
 
+    def interpret(self, scope):
+        return self.new_function.name
+
 
 class UnpackInstruction(Instruction):
     def __init__(self, *args, var_ids):
@@ -183,7 +194,11 @@ class UnpackInstruction(Instruction):
 
 
 class FunctionCallInstruction(Instruction):
-    pass
+    def interpret(self, scope, function, arguments):
+        return SpecialInstruction(
+            SpecialInstructionType.CALLFUNCTION, 
+            [function, arguments]
+        )
 
 
 class AdditionInstruction(Instruction):
@@ -205,7 +220,8 @@ class NegationInstruction(Instruction):
 
 
 class TupleInstruction(Instruction):
-    pass
+    def interpret(self, scope, *values):
+        return tuple(values)
 
 
 class ReturnInstruction(Instruction):
@@ -218,12 +234,22 @@ class ArrayInstruction(Instruction):
 
 def convert(code):
     executable = Executable()
+    
+    for name in BUILTINS:
+        refrence = code.scope.get(name)
+        executable.builtins[refrence.id_] = name
+    
     main = executable.add_function("main")
 
     function_instruction = main.add_instruction(code.instruction())
+    tuple_instruction = main.add_instruction(FloatingInstruction(
+        TupleInstruction,
+        tuple(),
+        Type(BasicType.tuple)
+    ))
     main.add_instruction(FloatingInstruction(
         FunctionCallInstruction, 
-        (function_instruction,),
+        (function_instruction, tuple_instruction),
         None
     ))
 
