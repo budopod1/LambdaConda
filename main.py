@@ -6,6 +6,7 @@ from interpreter import interpret
 def run(file):
     with open(file) as file:
         code = file.read()
+    print(code)
     code = parse(code)
     print(code)
     code = convert(code)
@@ -20,3 +21,4 @@ if __name__ == "__main__":
     # run("examples/tuple.ll")
     # run("examples/hello.ll")
     run("examples/test.ll")
+    # run("examples/for.ll")

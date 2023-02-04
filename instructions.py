@@ -216,7 +216,8 @@ class JoinInstruction(Instruction):
 
 
 class NegationInstruction(Instruction):
-    pass
+    def interpret(self, scope, value):
+        return -value
 
 
 class TupleInstruction(Instruction):

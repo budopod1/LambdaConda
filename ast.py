@@ -613,6 +613,19 @@ def capped(token):
 # ------------------------ #
 
 
+def unquote(text, quote_size):
+    text = text[quote_size:-quote_size]
+    result = ""
+    was_backslash = False
+    for char in text:
+        if char == "\\" and not was_backslash:
+            was_backslash = True
+        else:
+            result += char
+            was_backslash = False
+    return result
+
+
 class Program(Block):
     def startPROGRAM(self):
         self.constants = None
@@ -1065,7 +1078,9 @@ def parse(code):
         string = next(token_search(code, StringSearch), None)
         if string is None:
             break
-        name = constants.add(condense_tokens(string.tokens))
+        name = constants.add(unquote(
+            condense_tokens(string.tokens), 1
+        ))
         replace_token_search_match(code, string, [Constant(tokenify(name))])
 
     print("Removing comments...")
