@@ -1,4 +1,6 @@
 from pyenum import Enum
+from builtins_ import BUILTINS
+from type_ import Type, BasicType
 
 
 class Scope:
@@ -60,11 +62,10 @@ class Interpreter:
             return name
         return builtin # Otherwise return the value
 
-    def func_print(self, arguments):
-        print(arguments)
+    def func_print(self, value):
+        print(value)
 
-    def func_for(self, arguments):
-        value, func = arguments
+    def func_for(self, value, func):
         if isinstance(value, float):
             value = int(value)
         if isinstance(value, int):
@@ -74,25 +75,40 @@ class Interpreter:
             self.interpret_function(func, (item,))
 
     def interpret(self):
-        self.interpret_function("main", tuple())
+        main_func = self.executable.get_function("main")
+        self.interpret_function(main_func)
 
     def call_builtin(self, func_name, arguments):
-        return self.builtins[func_name](arguments)
+        return self.builtins[func_name](*arguments)
 
+    def call_function(self, func_name, arguments):
+        if func_name in self.builtins:
+            signature =  BUILTINS[func_name]
+        else:
+            function = self.executable.get_function(func_name)
+            signature = function.signature
+        param_num = len(signature.generics) - 1
+        if param_num == 0:
+            arguments = tuple()
+        elif param_num == 1:
+            if not isinstance(arguments, tuple):
+                arguments = (arguments,)
+            if signature.generics[1].type_ == BasicType.tuple:
+                assert isinstance(arguments, tuple)
+        if func_name in self.builtins:
+            return self.call_builtin(func_name, arguments)
+        return self.interpret_function(
+            function, *arguments
+        )
+    
     def special_instruction(self, instruction):
         command_type = instruction.command_type
         if command_type == SpecialInstructionType.CALLFUNCTION:
             func_name, arguments = instruction.arguments
-            if func_name in self.builtins:
-                return self.call_builtin(func_name, arguments)
-            return self.interpret_function(
-                func_name, arguments
-            )
+            return self.call_function(func_name, arguments)
 
-    def interpret_function(self, function_name, arguments):
-        function = self.executable.get_function(function_name)
+    def interpret_function(self, function, *arguments):
         for instruction in function:
-        
             result = instruction.interpret(
                 self.scope, 
                 *[

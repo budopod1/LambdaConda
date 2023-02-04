@@ -277,7 +277,8 @@ class Block(Node):
         return make_instruction(
             FunctionInstruction,
             self.value,
-            self.type_ if isinstance(self, Operand) else None
+            (self.type_ if isinstance(self, Operand) 
+             else Type(BasicType.func, [Type.none]))
         )
 
     SEPERATOR = "\n"

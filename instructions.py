@@ -34,8 +34,8 @@ class Executable:
         self.functions = {}
         self.builtins = {}
 
-    def add_function(self, name):
-        function = Function(name, self)
+    def add_function(self, name, signature):
+        function = Function(name, signature, self)
         self.functions[name] = function
         return function
 
@@ -55,8 +55,9 @@ value_id = IDGetter()
 
 
 class Function:
-    def __init__(self, name, executable):
+    def __init__(self, name, signature, executable):
         self.name = name
+        self.signature = signature
         self.executable = executable
         self.instructions = []
 
@@ -76,7 +77,7 @@ class Function:
         return instruction
 
     def __str__(self):
-        text = f"Function {self.name}:\n"
+        text = f"Function {self.name}: ({self.signature})\n"
         for instruction in self.instructions:
             text += "\t" + str(instruction) + "\n"
         return text
@@ -181,7 +182,7 @@ class FunctionInstruction(Instruction):
     def setup(self):
         executable = self.function.executable
         self.old_function = self.function
-        self.function = executable.add_function(self.id_)
+        self.function = executable.add_function(self.id_, self.type_)
 
     def interpret(self, scope):
         return self.new_function.name
@@ -240,7 +241,9 @@ def convert(code):
         refrence = code.scope.get(name)
         executable.builtins[refrence.id_] = name
     
-    main = executable.add_function("main")
+    main = executable.add_function(
+        "main", Type(BasicType.func, [Type.none])
+    )
 
     function_instruction = main.add_instruction(code.instruction())
     tuple_instruction = main.add_instruction(FloatingInstruction(
