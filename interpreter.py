@@ -108,6 +108,9 @@ class Interpreter:
             return self.call_function(func_name, arguments)
 
     def interpret_function(self, function, *arguments):
+        if function.arguments is not None:
+            for argument, value in zip(function.arguments, arguments):
+                self.scope[argument.id_] = value
         for instruction in function:
             result = instruction.interpret(
                 self.scope, 

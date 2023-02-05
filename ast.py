@@ -987,7 +987,11 @@ class ArgumentFunction(Operand):
 
 
 class Argument(Node):
-    pass
+    def startARGUMENT(self):
+        self.id_ = None
+
+    def string_data(self):
+        return {"id_": self.id_}
 
 
 class Arguments(Node):
@@ -1354,7 +1358,9 @@ def parse(code):
             arguments, function = token.value
             for argument in arguments.value:
                 name, type_ = argument.value
-                refrence = RefrenceWrapper(type_.to_type())
+                id_ = var_id()
+                argument.id_ = id_
+                refrence = RefrenceWrapper(type_.to_type(), id_)
                 function.scope.assign(
                     condense_tokens(name.value), 
                     refrence

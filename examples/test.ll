@@ -1,5 +1,5 @@
-a -> {
+a -> (v: int) {
     print("test")
-    print(1)
+    print(v)
 }
-a()
+a(1)
