@@ -6,11 +6,11 @@ from interpreter import interpret
 def run(file):
     with open(file) as file:
         code = file.read()
-    print(code)
+    # print(code)
     code = parse(code)
-    print(code)
+    # print(code)
     code = convert(code)
-    print(code)
+    # print(code)
     interpret(code)
 
 

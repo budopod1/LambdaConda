@@ -1069,7 +1069,10 @@ class NameSearch:
                 return TokenSearchStatus.FAIL
 
 
-def parse(code):
+def parse(code, verbose=False):
+    if not verbose:
+        print = lambda *a: None
+    
     print("Starting compile...")
 
     code = code.strip()
