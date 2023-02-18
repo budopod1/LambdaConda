@@ -72,7 +72,7 @@ class Interpreter:
             value = range(value)
         value = iter(value)
         for item in value:
-            self.interpret_function(func, (item,))
+            self.call_function(func, (item,))
 
     def interpret(self):
         main_func = self.executable.get_function("main")
@@ -105,7 +105,10 @@ class Interpreter:
         command_type = instruction.command_type
         if command_type == SpecialInstructionType.CALLFUNCTION:
             func_name, arguments = instruction.arguments
-            return self.call_function(func_name, arguments)
+            return self.call_function(func_name, arguments), None
+        elif command_type == SpecialInstructionType.RETURN:
+            value, = instruction.arguments
+            return None, value
 
     def interpret_function(self, function, *arguments):
         if function.arguments is not None:
@@ -121,5 +124,7 @@ class Interpreter:
             )
     
             if isinstance(result, SpecialInstruction):
-                result = self.special_instruction(result)
+                result, return_value = self.special_instruction(result)
+                if return_value is not None:
+                    return return_value
             self.scope.outputs[instruction.id_] = result

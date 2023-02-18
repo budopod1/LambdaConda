@@ -4,6 +4,7 @@ from interpreter import interpret
 
 
 def run(file):
+    print(f"Running {file}...")
     with open(file) as file:
         code = file.read()
     # print(code)
@@ -17,8 +18,8 @@ def run(file):
 if __name__ == "__main__":
     # run("examples/argument.ll")
     # run("examples/array.ll")
-    # run("examples/scope.ll")
-    # run("examples/tuple.ll")
-    # run("examples/hello.ll")
+    run("examples/scope.ll")
+    run("examples/tuple.ll")
+    run("examples/hello.ll")
     run("examples/test.ll")
-    # run("examples/for.ll")
+    run("examples/for.ll")

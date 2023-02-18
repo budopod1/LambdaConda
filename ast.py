@@ -622,6 +622,15 @@ def unquote(text, quote_size):
         if char == "\\" and not was_backslash:
             was_backslash = True
         else:
+            if was_backslash:
+                char = {
+                    "n": "\n",
+                    "r": "\r",
+                    "t": "\t",
+                    "'": "'",
+                    '"': '"',
+                    "\\": "\\"
+                }[char]
             result += char
             was_backslash = False
     return result
@@ -1070,8 +1079,12 @@ class NameSearch:
 
 
 def parse(code, verbose=False):
+    # Not a great solution but whatever
     if not verbose:
-        print = lambda *a: None
+        print = lambda *a, **b: None
+    else:
+        import builtins
+        print = builtins.print
     
     print("Starting compile...")
 
@@ -1225,6 +1238,9 @@ def parse(code, verbose=False):
         [
             lambda: ConvertRule(Name, Variable),
             
+            lambda: GroupRule([Arguments, Function], (0, 1),
+                              ArgumentFunction),
+            
             lambda: GroupRule([GroupOpen, Operand, GroupClose], (1, ), Group),
             lambda: GroupRule([GroupOpen, GroupClose], tuple(), Tuple),
             lambda: GroupRule([MinusOperator, Operand], (1, ), Negation),
@@ -1274,8 +1290,6 @@ def parse(code, verbose=False):
                               (0, 2), Unpacking),
             lambda: GroupRule([ReturnOperator, Operand],
                             (1,), Return),
-            lambda: GroupRule([Arguments, Function], (0, 1),
-                              ArgumentFunction),
         ]
     ]
 
@@ -1302,6 +1316,7 @@ def parse(code, verbose=False):
             for rule in transform_group:
                 found_any = code.visit(transform_visit, (rule,))
                 if found_any:
+                    # print(code)
                     break
 
     code.ensure_parents()
@@ -1409,6 +1424,8 @@ def parse(code, verbose=False):
             continue
         break
 
+    print(code)
+    
     return code
 
 

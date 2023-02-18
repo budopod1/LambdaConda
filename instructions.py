@@ -205,17 +205,18 @@ class FunctionCallInstruction(Instruction):
 
 
 class AdditionInstruction(Instruction):
-    pass
-    # Replace AdditionInstruction /w instructions for individual types
-    # (eg AdditonInstruction, ConcatinationInstruction, JoinInstruction)
+    def interpret(self, scope, v1, v2):
+        return v1 + v2
 
 
 class ConcatenationInstruction(Instruction):
-    pass
+    def interpret(self, scope, v1, v2):
+        return str(v1) + str(v2)
 
 
 class JoinInstruction(Instruction):
-    pass
+    def interpret(self, scope, v1, v2):
+        return v1 + v2
 
 
 class NegationInstruction(Instruction):
@@ -229,11 +230,16 @@ class TupleInstruction(Instruction):
 
 
 class ReturnInstruction(Instruction):
-    pass
+    def interpret(self, scope, value):
+        return SpecialInstruction(
+            SpecialInstructionType.RETURN, 
+            [value]
+        )
 
 
 class ArrayInstruction(Instruction):
-    pass
+    def interpret(self, scope, *values):
+        return list(values)
 
 
 def convert(code):
