@@ -1,6 +1,6 @@
-# Implement structs as shown here later
+# Implement definitions as shown here later
 
-struct Tester tuple<
+def Tester tuple<
     float,
     tuple<
         str,
@@ -8,8 +8,6 @@ struct Tester tuple<
     >
 >
 
-# NOTE: initate all primitives in struct as if they were being called by 
-# constructor in python (e.g. float()=0)
 t1 -> new Tester
 t2 -> (1, ("a", "b"))
 

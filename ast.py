@@ -774,7 +774,8 @@ class Instantiation(Operand):
         return make_instruction(
             InstantiationInstruction,
             [],
-            self.type_
+            self.type_,
+            {"instantiate_type": self.type_}
         )
 
 

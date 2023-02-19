@@ -3,23 +3,28 @@ from instructions import convert
 from interpreter import interpret
 
 
-def run(file):
-    print(f"Running {file}...")
+def run(file, verbose=False):
     with open(file) as file:
         code = file.read()
     # print(code)
-    code = parse(code, True)
+    code = parse(code, verbose)
     # print(code)
-    code = convert(code, True)
+    code = convert(code, verbose)
     # print(code)
     interpret(code)
 
 
+def runNamed(file):
+    print(f"Running {file}...")
+    run(file)
+
+
 if __name__ == "__main__":
-    run("examples/argument.ll")
-    # run("examples/array.ll")
-    run("examples/scope.ll")
-    run("examples/tuple.ll")
-    run("examples/hello.ll")
-    run("examples/test.ll")
-    run("examples/for.ll")
+    runNamed("examples/argument.ll")
+    runNamed("examples/array.ll")
+    # runNamed("examples/definition.ll")
+    runNamed("examples/for.ll")
+    runNamed("examples/hello.ll")
+    runNamed("examples/scope.ll")
+    runNamed("examples/test.ll")
+    runNamed("examples/tuple.ll")

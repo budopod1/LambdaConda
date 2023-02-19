@@ -169,7 +169,29 @@ class VariableInstruction(Instruction):
 
 
 class InstantiationInstruction(Instruction):
-    pass
+    def __init__(self, *args, instantiate_type):
+        super().__init__(*args)
+        self.instantiate_type = instantiate_type
+        
+    def interpret(self, scope):
+        def instantiate(type_):
+            btype = type_.type_
+            if btype == BasicType.str:
+                return ""
+            elif btype == BasicType.float:
+                return 0.0
+            elif btype == BasicType.int:
+                return 0
+            elif btype == BasicType.bool:
+                return False
+            elif btype == BasicType.func:
+                return_type, *_ = btype.generics
+                return lambda *a: instantiate(return_type)
+            elif btype == BasicType.tuple:
+                return (instantiate(generic) for generic in type_.generics)
+            elif btype == BasicType.array:
+                return []
+        return instantiate(self.instantiate_type)
 
 
 class FunctionInstruction(Instruction):
