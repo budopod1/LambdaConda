@@ -12,8 +12,8 @@ hello2 -> (name: str, age: float) {
 }
 
 # This:
-hello("me", 3)
-hello("you", 1)
+hello(("me", 4),)
+hello(("you", 2),)
 
 # Does the same as this:
 hello2("me", 3)

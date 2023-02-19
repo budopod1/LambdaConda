@@ -195,6 +195,11 @@ class UnpackInstruction(Instruction):
         self.var_ids = var_ids
         super().__init__(*args)
 
+    def interpret(self, scope, value):
+        for var_id, item in zip(self.var_ids, value):
+            scope[var_id] = item
+        return value
+
 
 class FunctionCallInstruction(Instruction):
     def interpret(self, scope, function, arguments):
@@ -242,7 +247,7 @@ class ArrayInstruction(Instruction):
         return list(values)
 
 
-def convert(code):
+def convert(code, verbose=False):
     executable = Executable()
     
     for name in BUILTINS:
@@ -264,5 +269,8 @@ def convert(code):
         (function_instruction, tuple_instruction),
         None
     ))
+
+    if verbose:
+        print(executable)
 
     return executable

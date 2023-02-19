@@ -115,6 +115,13 @@ class Interpreter:
             for argument, value in zip(function.arguments, arguments):
                 self.scope[argument.id_] = value
         for instruction in function:
+            for param in ([
+                    self.scope.outputs[param] 
+                    for param in instruction.params
+                ]):
+                if param is None:
+                    print(instruction)
+            
             result = instruction.interpret(
                 self.scope, 
                 *[
@@ -122,6 +129,9 @@ class Interpreter:
                     for param in instruction.params
                 ]
             )
+            
+            if result is None:
+                print(instruction)
     
             if isinstance(result, SpecialInstruction):
                 result, return_value = self.special_instruction(result)

@@ -907,6 +907,7 @@ class Constant(Refrence):
 
 class RefrenceWrapper: # A object linking refrences in the AST
     def __init__(self, type_, id_=None):
+        assert isinstance(type_, Type), f"Type must be Type (found {type(type_)})"
         self.type_ = type_
         self.id_ = id_
 
@@ -1378,6 +1379,8 @@ def parse(code, verbose=False):
                 name, type_ = argument.value
                 id_ = var_id()
                 argument.id_ = id_
+                # print(id(function.scope), condense_tokens(name.value),
+                #       type_.to_type())
                 refrence = RefrenceWrapper(type_.to_type(), id_)
                 function.scope.assign(
                     condense_tokens(name.value), 
@@ -1392,11 +1395,16 @@ def parse(code, verbose=False):
                 return
             scope = token.search_parent(Block).scope
             changed_any = False
+            # print(tuple_type, tuple_type.generics)
             for value, type_ in zip(values.value, tuple_type.generics):
                 name = condense_tokens(value.value)
                 if scope.get(name) is not None:
                     continue
-                changed = scope.assign(name, RefrenceWrapper(value))
+                # print(scope.scope, id(scope), name, type_)
+                if type_ is None or type_.is_none():
+                    continue
+                changed = scope.assign(name, RefrenceWrapper(type_, var_id()))
+                # print(scope.scope)
                 if changed:
                     changed_any |= True
             return changed_any
@@ -1404,11 +1412,12 @@ def parse(code, verbose=False):
     def variable_visit(token, args):
         if isinstance(token, Variable):
             token.id_ = var_id()
-
+    
     found_any = True
     code.visit(arguments_visit, tuple())
     code.visit(variable_visit, tuple())
     while True:
+        # print(code)
         found_any = False
         found_any = code.visit(compute_visit, tuple())
         if found_any:
@@ -1416,10 +1425,10 @@ def parse(code, verbose=False):
         found_any = code.visit(assign_visit, tuple())
         if found_any:
             continue
-        found_any = code.visit(unpack_visit, tuple())
+        found_any = code.visit(reference_visit, tuple())
         if found_any:
             continue
-        found_any = code.visit(reference_visit, tuple())
+        found_any = code.visit(unpack_visit, tuple())
         if found_any:
             continue
         break

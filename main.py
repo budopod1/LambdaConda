@@ -8,15 +8,15 @@ def run(file):
     with open(file) as file:
         code = file.read()
     # print(code)
-    code = parse(code)
+    code = parse(code, True)
     # print(code)
-    code = convert(code)
+    code = convert(code, True)
     # print(code)
     interpret(code)
 
 
 if __name__ == "__main__":
-    # run("examples/argument.ll")
+    run("examples/argument.ll")
     # run("examples/array.ll")
     run("examples/scope.ll")
     run("examples/tuple.ll")
