@@ -14,17 +14,17 @@ def run(file, verbose=False):
     interpret(code)
 
 
-def runNamed(file):
+def run_named(file, verbose=False):
     print(f"Running {file}...")
-    run(file)
+    run(file, verbose)
 
 
 if __name__ == "__main__":
-    runNamed("examples/argument.ll")
-    runNamed("examples/array.ll")
-    # runNamed("examples/definition.ll")
-    runNamed("examples/for.ll")
-    runNamed("examples/hello.ll")
-    runNamed("examples/scope.ll")
-    runNamed("examples/test.ll")
-    runNamed("examples/tuple.ll")
+    run_named("examples/argument.ll")
+    run_named("examples/array.ll")
+    run_named("examples/definition.ll")
+    run_named("examples/for.ll")
+    run_named("examples/hello.ll")
+    run_named("examples/scope.ll")
+    run_named("examples/test.ll")
+    run_named("examples/tuple.ll")

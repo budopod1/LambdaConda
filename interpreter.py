@@ -91,10 +91,7 @@ class Interpreter:
         if param_num == 0:
             arguments = tuple()
         elif param_num == 1:
-            if not isinstance(arguments, tuple):
-                arguments = (arguments,)
-            if signature.generics[1].type_ == BasicType.tuple:
-                assert isinstance(arguments, tuple)
+            arguments = (arguments,)
         if func_name in self.builtins:
             return self.call_builtin(func_name, arguments)
         return self.interpret_function(

@@ -62,6 +62,15 @@ class Token:
             if "start" in key and callable(value):
                 value()
 
+    def copy(self):
+        return type(self)(
+            [
+                child.copy()
+                for child in self.value
+            ] if self.is_tree() else self.value,
+            self.tags.copy()
+        )
+    
     def ensure_parents(self):
         if self.is_text():
             return
@@ -139,7 +148,7 @@ class Token:
                 if token.is_tree():
                     result += self.SEPERATOR
             if result.endswith(self.SEPERATOR):
-                result = result[:-2]
+                result = result[:-len(self.SEPERATOR)]
 
             if self.BORDER_SEP:
                 result = self.SEPERATOR + result
@@ -653,6 +662,14 @@ class Newline(Whitespace):
     pass
 
 
+class Definition(Node):
+    pass
+
+
+class Define(Symbolic):
+    pass
+
+
 class FunctionOpen(Symbolic):
     pass
 
@@ -814,8 +831,10 @@ class Unpacking(Operand):
 
 class Addition(Operand):
     def _compute_type(self):
-        child, _ = self.value
-        return child.type_
+        v1, v2 = self.value
+        if v2.type_.type_ == BasicType.str:
+            return v2.type_
+        return v1.type_
 
     def instruction(self):
         instruction = None
@@ -854,7 +873,8 @@ class Negation(Operand):
 
 class Group(Operand):
     def _compute_type(self):
-        child, = self.value
+        child, *_ = self.value
+        assert not _, _
         return child.type_
 
     def instruction(self):
@@ -1080,6 +1100,46 @@ class NameSearch:
                 return TokenSearchStatus.FAIL
 
 
+class DefenitionRefrenceSearch:
+    def __init__(self, name):
+        self.name = name
+    
+    def __call__(self, token):
+        if not token.is_a(Name):
+            return TokenSearchStatus.FAIL
+        name = condense_tokens(token.value)
+        if name == self.name:
+            return TokenSearchStatus.FINISh
+
+
+class DefinitionRule:
+    def __init__(self, code):
+        self.code = code
+
+    def __call__(self, token):
+        if not token.is_a(Definition):
+            return TokenSearchStatus.FAIL
+        definition_name, value = token.value
+        definition_name = condense_tokens(
+            definition_name.value
+        )
+        def refrence_search(token, _):
+            if token.is_text():
+                return
+            for i, sub in enumerate(token.value):
+                if not sub.is_a(Name):
+                    continue
+                name = condense_tokens(sub.value)
+                if name != definition_name:
+                    continue
+                token.value[i] = value.copy()
+        self.code.visit(refrence_search, tuple())
+        return TokenSearchStatus.FINISH
+
+    def result(self, _):
+        return []
+
+
 def parse(code, verbose=False):
     # Not a great solution but whatever
     if not verbose:
@@ -1160,6 +1220,7 @@ def parse(code, verbose=False):
         create_text_conversion("<", GenericOpen),
         create_text_conversion(">", GenericClose),
         create_text_conversion("new", Instantiater),
+        create_text_conversion("def", Define),
     ])
 
     print("Starting name search...")
@@ -1216,6 +1277,7 @@ def parse(code, verbose=False):
             
             lambda: GroupRule([TypeToken, GenericList], (0, 1), GenericTypeToken),
             lambda: GroupRule([Name, Typer, TypeToken], (0, 2), Argument),
+            lambda: GroupRule([Name, Typer, Name], (0, 2), Argument),
             
             # Argument lists
             lambda: MergeRule(
@@ -1238,13 +1300,28 @@ def parse(code, verbose=False):
             ),
         ],
         [
+            lambda: GroupRule([GroupOpen, GroupClose], tuple(), Tuple),
+            lambda: BoundaryRule(GroupOpen, GroupClose, Group, allow_text=True),
+        ],
+        [
+            lambda: GroupRule(
+                [Define, Name, Group],
+                (1, 2), Definition
+            ),
+            lambda: GroupRule(
+                [Define, Name, TypeToken],
+                (1, 2), Definition
+            ),
+        ],
+        [
+            lambda: DefinitionRule(code),
+        ],
+        [
             lambda: ConvertRule(Name, Variable),
             
             lambda: GroupRule([Arguments, Function], (0, 1),
                               ArgumentFunction),
             
-            lambda: GroupRule([GroupOpen, Operand, GroupClose], (1, ), Group),
-            lambda: GroupRule([GroupOpen, GroupClose], tuple(), Tuple),
             lambda: GroupRule([MinusOperator, Operand], (1, ), Negation),
             lambda: GroupRule([Operand, MinusOperator, Operand],
                               (0, 2), Subtraction),
@@ -1283,13 +1360,12 @@ def parse(code, verbose=False):
                               (0, ), Tuple),
             lambda: MergeRule([UnfinishedTuple, Operand], 0, (1, ), Tuple),
             
-            lambda: GroupRule([Operand, Tuple], (0, 1), FunctionCall),
-            lambda: GroupRule([Operand, Group], (0, 1), FunctionCall),
-            
             lambda: GroupRule([Variable, AssignOperator, Operand],
                               (0, 2), Assignment),
             lambda: GroupRule([Tuple, AssignOperator, Operand],
                               (0, 2), Unpacking),
+            lambda: GroupRule([Operand, Tuple], (0, 1), FunctionCall),
+            lambda: GroupRule([Operand, Group], (0, 1), FunctionCall),
             lambda: GroupRule([ReturnOperator, Operand],
                             (1,), Return),
         ]
@@ -1321,6 +1397,7 @@ def parse(code, verbose=False):
                     # print(code)
                     break
 
+    print(code)
     code.ensure_parents()
 
     print("Starting type inference...")

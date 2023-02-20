@@ -188,7 +188,7 @@ class InstantiationInstruction(Instruction):
                 return_type, *_ = btype.generics
                 return lambda *a: instantiate(return_type)
             elif btype == BasicType.tuple:
-                return (instantiate(generic) for generic in type_.generics)
+                return tuple((instantiate(generic) for generic in type_.generics))
             elif btype == BasicType.array:
                 return []
         return instantiate(self.instantiate_type)
