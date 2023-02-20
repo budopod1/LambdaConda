@@ -27,4 +27,4 @@ if __name__ == "__main__":
     run_named("examples/hello.ll")
     run_named("examples/scope.ll")
     run_named("examples/test.ll")
-    run_named("examples/tuple.ll")
+     run_named("examples/tuple.ll")
