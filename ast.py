@@ -1,6 +1,6 @@
 from pyenum import Enum
 from id_ import IDGetter
-from instructions import make_instruction, FunctionInstruction, AssignInstruction, InstantiationInstruction, VariableInstruction, UnpackInstruction, FunctionCallInstruction, AdditionInstruction, TupleInstruction, ArrayInstruction, NegationInstruction, ReturnInstruction, ConcatenationInstruction, JoinInstruction, ConstantInstruction
+from instructions import make_instruction, FunctionInstruction, AssignInstruction, InstantiationInstruction, VariableInstruction, UnpackInstruction, FunctionCallInstruction, AdditionInstruction, TupleInstruction, ArrayInstruction, NegationInstruction, ReturnInstruction, ConcatenationInstruction, JoinTupleInstruction, JoinArrayInstruction, ConstantInstruction
 from type_ import BasicType, Type
 from builtins_ import BUILTINS
 
@@ -844,7 +844,9 @@ class Addition(Operand):
         elif basic_type == BasicType.str:
             instruction = ConcatenationInstruction
         elif basic_type == BasicType.array:
-            instruction = JoinInstruction
+            instruction = JoinArrayInstruction
+        elif basic_type == BasicType.tuple:
+            instruction = JoinTupleInstruction
         return make_instruction(
             instruction,
             self.value,

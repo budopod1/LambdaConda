@@ -233,7 +233,7 @@ class FunctionCallInstruction(Instruction):
 
 class AdditionInstruction(Instruction):
     def interpret(self, scope, v1, v2):
-        return v1 + v2
+        return float(v1) + float(v2)
 
 
 class ConcatenationInstruction(Instruction):
@@ -241,9 +241,14 @@ class ConcatenationInstruction(Instruction):
         return str(v1) + str(v2)
 
 
-class JoinInstruction(Instruction):
+class JoinArrayInstruction(Instruction):
     def interpret(self, scope, v1, v2):
-        return v1 + v2
+        return list(v1) + (v2)
+
+
+class JoinTupleInstruction(Instruction):
+    def interpret(self, scope, v1, v2):
+        return tuple(v1) + tuple(v2)
 
 
 class NegationInstruction(Instruction):
