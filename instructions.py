@@ -231,6 +231,11 @@ class FunctionCallInstruction(Instruction):
         )
 
 
+class SubtractionInstruction(Instruction):
+    def interpret(self, scope, v1, v2):
+        return float(v1) - float(v2)
+
+
 class AdditionInstruction(Instruction):
     def interpret(self, scope, v1, v2):
         return float(v1) + float(v2)
