@@ -72,7 +72,7 @@ class Interpreter:
             value = range(value)
         value = iter(value)
         for item in value:
-            self.call_function(func, item)
+            self.call_function(func, (item,))
 
     def interpret(self):
         main_func = self.executable.get_function("main")

@@ -22,7 +22,7 @@ def run_named(file, verbose=False):
 if __name__ == "__main__":
     run_named("examples/argument.ll")
     run_named("examples/array.ll")
-    run_named("examples/definition.ll", True)
+    run_named("examples/definition.ll")
     run_named("examples/for.ll")
     run_named("examples/hello.ll")
     run_named("examples/scope.ll")
