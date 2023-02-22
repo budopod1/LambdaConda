@@ -20,11 +20,12 @@ def run_named(file, verbose=False):
 
 
 if __name__ == "__main__":
-    run_named("examples/argument.ll")
-    run_named("examples/array.ll")
-    run_named("examples/definition.ll")
-    run_named("examples/for.ll")
-    run_named("examples/hello.ll")
-    run_named("examples/scope.ll")
-    run_named("examples/test.ll")
-    run_named("examples/tuple.ll")
+    run_named("examples/argument.lt")
+    run_named("examples/array.lt")
+    run_named("examples/definition.lt")
+    run_named("examples/for.lt")
+    run_named("examples/hello.lt")
+    run_named("examples/math.lt")
+    run_named("examples/scope.lt")
+    run_named("examples/test.lt")
+    run_named("examples/tuple.lt")

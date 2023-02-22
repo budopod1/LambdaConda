@@ -860,6 +860,12 @@ class Subtraction(Operand):
         return child.type_
 
 
+class Multiplication(Operand):
+    def _compute_type(self):
+        child, _ = self.value
+        return child.type_
+
+
 class Negation(Operand):
     def _compute_type(self):
         child, = self.value
