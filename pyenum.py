@@ -4,9 +4,9 @@ class EnumValue:
         self.value = value
 
     def __eq__(self, other):
-        if not isinstance(other, EnumValue):
-            raise TypeError(f"Cannot compare EnumValue with {type(other)}")
-        return self.enum == other.enum and self.value == other.value
+        if isinstance(other, EnumValue):
+            return self.enum == other.enum and self.value == other.value
+        return False
 
     def __ne__(self, other):
         return not (other == self)

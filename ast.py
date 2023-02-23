@@ -382,13 +382,15 @@ class SetRule:
 class GroupRule:
     def __init__(self, types, keep, holder):
         self.types = types
+        self.i = 0
         self.keep = keep
         self.holder = capped(holder)
 
     def __call__(self, token):
-        expected = self.types.pop(0)
+        expected = self.types[self.i]
+        self.i += 1
         if token.is_a(expected):
-            if not self.types:
+            if self.i == len(self.types):
                 return TokenSearchStatus.FINISH
             return TokenSearchStatus.CONTINUE
         else:
@@ -422,14 +424,16 @@ class CollapseRule:
 class MergeRule:
     def __init__(self, types, center, keep, convert):
         self.types = types
+        self.i = 0
         self.center = center
         self.keep = keep
         self.convert = convert
 
     def __call__(self, token):
-        expected = self.types.pop(0)
+        expected = self.types[self.i]
+        self.i += 1
         if token.is_a(expected):
-            if not self.types:
+            if self.i == len(self.types):
                 return TokenSearchStatus.FINISH
             return TokenSearchStatus.CONTINUE
         else:
@@ -1456,17 +1460,28 @@ def parse(code, verbose=False):
         rule, = args
         if TokenExtraData.CAPPED in token.tags:
             return
-        match = next(token_search(token, rule), None)
-        if match is None:
+        if id(rule) in token.tags:
             return
-        if TokenExtraData.UNIT in token.tags:
+        match = next(token_search(token, rule), None)
+        valid = True
+        if match is None:
+            valid = False
+        if valid and TokenExtraData.UNIT in token.tags:
             if match.start != 0 or match.end < len(token.value) - 1:
-                return
+                valid = False
+        if not valid:
+            token.tags.append(id(rule))
+            return
+        token.tags = list(filter(
+            lambda tag: TokenExtraData.has(tag),
+            token.tags
+        ))
         result = match.searcher.result(match.tokens)
         replace_token_search_match(token, match, result)
         return True
 
     for transform_group in transform_groups:
+        print("Starting new transform group...")
         found_any = True
         while found_any:
             found_any = False

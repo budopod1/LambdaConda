@@ -20,6 +20,8 @@ def run_named(file, verbose=False):
 
 
 if __name__ == "__main__":
+    # from timer import Timer
+    # timer = Timer()
     run_named("examples/argument.lc")
     run_named("examples/array.lc")
     run_named("examples/definition.lc")
@@ -29,3 +31,4 @@ if __name__ == "__main__":
     run_named("examples/scope.lc")
     run_named("examples/test.lc")
     run_named("examples/tuple.lc")
+    # print(timer.elapsed())
