@@ -1,6 +1,6 @@
 from pyenum import Enum
 from id_ import IDGetter
-from instructions import make_instruction, FunctionInstruction, AssignInstruction, InstantiationInstruction, VariableInstruction, UnpackInstruction, FunctionCallInstruction, AdditionInstruction, TupleInstruction, ArrayInstruction, NegationInstruction, ReturnInstruction, ConcatenationInstruction, JoinTupleInstruction, JoinArrayInstruction, ConstantInstruction, SubtractionInstruction
+from instructions import make_instruction, FunctionInstruction, AssignInstruction, InstantiationInstruction, VariableInstruction, UnpackInstruction, FunctionCallInstruction, AdditionInstruction, TupleInstruction, ArrayInstruction, NegationInstruction, ReturnInstruction, ConcatenationInstruction, JoinTupleInstruction, JoinArrayInstruction, ConstantInstruction, SubtractionInstruction, DivisionInstruction, MultiplicationInstruction, ExponentiationInstruction
 from type_ import BasicType, Type
 from builtins_ import BUILTINS
 
@@ -716,6 +716,18 @@ class AdditionOperator(Operator):
     pass
 
 
+class MultiplicationOperator(Operator):
+    pass
+
+
+class DivisionOperator(Operator):
+    pass
+
+
+class ExponentiationOperator(Operator):
+    pass
+
+
 class Instantiater(Operator):
     pass
 
@@ -867,10 +879,43 @@ class Subtraction(Operand):
         )
 
 
+class Exponentiation(Operand):
+    def _compute_type(self):
+        child, _ = self.value
+        return child.type_
+        
+    def instruction(self):
+        return make_instruction(
+            ExponentiationInstruction,
+            self.value,
+            self.type_
+        )
+
+
 class Multiplication(Operand):
     def _compute_type(self):
         child, _ = self.value
         return child.type_
+        
+    def instruction(self):
+        return make_instruction(
+            MultiplicationInstruction,
+            self.value,
+            self.type_
+        )
+
+
+class Division(Operand):
+    def _compute_type(self):
+        child, _ = self.value
+        return child.type_
+        
+    def instruction(self):
+        return make_instruction(
+            DivisionInstruction,
+            self.value,
+            self.type_
+        )
 
 
 class Negation(Operand):
@@ -1221,6 +1266,9 @@ def parse(code, verbose=False):
         create_text_conversion("->", AssignOperator),
         create_text_conversion("-", MinusOperator),
         create_text_conversion("+", AdditionOperator),
+        create_text_conversion("/", DivisionOperator),
+        create_text_conversion("**", ExponentiationOperator),
+        create_text_conversion("*", MultiplicationOperator),
         create_text_conversion("return", ReturnOperator),
         create_text_conversion("{", FunctionOpen),
         create_text_conversion("}", FunctionClose),
@@ -1293,7 +1341,8 @@ def parse(code, verbose=False):
             lambda: GroupRule([TypeToken, GenericList], (0, 1), GenericTypeToken),
             lambda: GroupRule([Name, Typer, TypeToken], (0, 2), Argument),
             lambda: GroupRule([Name, Typer, Name], (0, 2), Argument),
-            
+        ],
+        [   
             # Argument lists
             lambda: MergeRule(
                 [UnfinishedArguments, Argument, Comma],
@@ -1333,15 +1382,21 @@ def parse(code, verbose=False):
         ],
         [
             lambda: ConvertRule(Name, Variable),
-            
             lambda: GroupRule([Arguments, Function], (0, 1),
                               ArgumentFunction),
-            
+        ],
+        [
+            lambda: GroupRule([Operand, ExponentiationOperator, Operand],
+                              (0, 2), Exponentiation),
+            lambda: GroupRule([Operand, MultiplicationOperator, Operand],
+                              (0, 2), Multiplication),
+            lambda: GroupRule([Operand, DivisionOperator, Operand],
+                              (0, 2), Division),
+            lambda: GroupRule([Operand, AdditionOperator, Operand],
+                              (0, 2), Addition),
             lambda: GroupRule([Operand, MinusOperator, Operand],
                               (0, 2), Subtraction),
             lambda: GroupRule([MinusOperator, Operand], (1,), Negation),
-            lambda: GroupRule([Operand, AdditionOperator, Operand],
-                              (0, 2), Addition),
             lambda: GroupRule([Instantiater, TypeToken], (1,), Instantiation),
 
             # Arrays

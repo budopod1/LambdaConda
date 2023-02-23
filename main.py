@@ -25,7 +25,7 @@ if __name__ == "__main__":
     run_named("examples/definition.lc")
     run_named("examples/for.lc")
     run_named("examples/hello.lc")
-    # run_named("examples/math.lc")
+    run_named("examples/math.lc")
     run_named("examples/scope.lc")
     run_named("examples/test.lc")
     run_named("examples/tuple.lc")

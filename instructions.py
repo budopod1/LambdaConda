@@ -241,6 +241,21 @@ class AdditionInstruction(Instruction):
         return float(v1) + float(v2)
 
 
+class MultiplicationInstruction(Instruction):
+    def interpret(self, scope, v1, v2):
+        return float(v1) * float(v2)
+
+
+class ExponentiationInstruction(Instruction):
+    def interpret(self, scope, v1, v2):
+        return float(v1) ** float(v2)
+
+
+class DivisionInstruction(Instruction):
+    def interpret(self, scope, v1, v2):
+        return float(v1) / float(v2)
+
+
 class ConcatenationInstruction(Instruction):
     def interpret(self, scope, v1, v2):
         return str(v1) + str(v2)
