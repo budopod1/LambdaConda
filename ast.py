@@ -844,9 +844,18 @@ class Unpacking(Operand):
 class Addition(Operand):
     def _compute_type(self):
         v1, v2 = self.value
-        if v2.type_.type_ == BasicType.str:
-            return v2.type_
-        return v1.type_
+        v1 = v1.type_
+        v2 = v2.type_
+        if v1.is_none() or v2.is_none():
+            return Type.none
+        if v2.type_ == BasicType.str:
+            return v2
+        if v1.type_ == BasicType.tuple:
+            return Type(
+                BasicType.tuple,
+                v1.generics + v2.generics
+            )
+        return v1
 
     def instruction(self):
         instruction = None
