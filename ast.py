@@ -1,6 +1,6 @@
 from pyenum import Enum
 from id_ import IDGetter
-from instructions import make_instruction, FunctionInstruction, AssignInstruction, InstantiationInstruction, VariableInstruction, UnpackInstruction, FunctionCallInstruction, AdditionInstruction, TupleInstruction, ArrayInstruction, NegationInstruction, ReturnInstruction, ConcatenationInstruction, JoinTupleInstruction, JoinArrayInstruction, ConstantInstruction
+from instructions import make_instruction, FunctionInstruction, AssignInstruction, InstantiationInstruction, VariableInstruction, UnpackInstruction, FunctionCallInstruction, AdditionInstruction, TupleInstruction, ArrayInstruction, NegationInstruction, ReturnInstruction, ConcatenationInstruction, JoinTupleInstruction, JoinArrayInstruction, ConstantInstruction, SubtractionInstruction
 from type_ import BasicType, Type
 from builtins_ import BUILTINS
 
@@ -859,6 +859,13 @@ class Subtraction(Operand):
         child, _ = self.value
         return child.type_
 
+    def instruction(self):
+        return make_instruction(
+            SubtractionInstruction,
+            self.value,
+            self.type_
+        )
+
 
 class Multiplication(Operand):
     def _compute_type(self):
@@ -1330,9 +1337,9 @@ def parse(code, verbose=False):
             lambda: GroupRule([Arguments, Function], (0, 1),
                               ArgumentFunction),
             
-            lambda: GroupRule([MinusOperator, Operand], (1, ), Negation),
             lambda: GroupRule([Operand, MinusOperator, Operand],
                               (0, 2), Subtraction),
+            lambda: GroupRule([MinusOperator, Operand], (1,), Negation),
             lambda: GroupRule([Operand, AdditionOperator, Operand],
                               (0, 2), Addition),
             lambda: GroupRule([Instantiater, TypeToken], (1,), Instantiation),
