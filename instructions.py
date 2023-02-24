@@ -2,6 +2,7 @@ from id_ import IDGetter
 from interpreter import SpecialInstruction, SpecialInstructionType
 from type_ import Type, BasicType
 from builtins_ import BUILTINS
+from cast import stringify, boolify, floatify
 
 
 def make_instruction(instruction_type, children, type_, extra=None):
@@ -231,34 +232,59 @@ class FunctionCallInstruction(Instruction):
         )
 
 
+class EqualsInstruction(Instruction):
+    def interpret(self, scope, v1, v2):
+        return v1 == v2
+
+
+class NotEqualsInstruction(Instruction):
+    def interpret(self, scope, v1, v2):
+        return v1 != v2
+
+
+class AndInstruction(Instruction):
+    def interpret(self, scope, v1, v2):
+        return boolify(v1) and boolify(v2)
+
+
+class OrInstruction(Instruction):
+    def interpret(self, scope, v1, v2):
+        return boolify(v1) or boolify(v2)
+
+
+class NotInstruction(Instruction):
+    def interpret(self, scope, v1):
+        return not boolify(v1)
+
+
 class SubtractionInstruction(Instruction):
     def interpret(self, scope, v1, v2):
-        return float(v1) - float(v2)
+        return floatify(v1) - floatify(v2)
 
 
 class AdditionInstruction(Instruction):
     def interpret(self, scope, v1, v2):
-        return float(v1) + float(v2)
+        return floatify(v1) + floatify(v2)
 
 
 class MultiplicationInstruction(Instruction):
     def interpret(self, scope, v1, v2):
-        return float(v1) * float(v2)
+        return floatify(v1) * floatify(v2)
 
 
 class ExponentiationInstruction(Instruction):
     def interpret(self, scope, v1, v2):
-        return float(v1) ** float(v2)
+        return floatify(v1) ** floatify(v2)
 
 
 class DivisionInstruction(Instruction):
     def interpret(self, scope, v1, v2):
-        return float(v1) / float(v2)
+        return floatify(v1) / floatify(v2)
 
 
 class ConcatenationInstruction(Instruction):
     def interpret(self, scope, v1, v2):
-        return str(v1) + str(v2)
+        return stringify(v1) + stringify(v2)
 
 
 class JoinArrayInstruction(Instruction):

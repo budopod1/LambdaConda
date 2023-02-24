@@ -1,6 +1,6 @@
 from pyenum import Enum
 from id_ import IDGetter
-from instructions import make_instruction, FunctionInstruction, AssignInstruction, InstantiationInstruction, VariableInstruction, UnpackInstruction, FunctionCallInstruction, AdditionInstruction, TupleInstruction, ArrayInstruction, NegationInstruction, ReturnInstruction, ConcatenationInstruction, JoinTupleInstruction, JoinArrayInstruction, ConstantInstruction, SubtractionInstruction, DivisionInstruction, MultiplicationInstruction, ExponentiationInstruction
+from instructions import make_instruction, FunctionInstruction, AssignInstruction, InstantiationInstruction, VariableInstruction, UnpackInstruction, FunctionCallInstruction, AdditionInstruction, TupleInstruction, ArrayInstruction, NegationInstruction, ReturnInstruction, ConcatenationInstruction, JoinTupleInstruction, JoinArrayInstruction, ConstantInstruction, SubtractionInstruction, DivisionInstruction, MultiplicationInstruction, ExponentiationInstruction, EqualsInstruction, NotEqualsInstruction, OrInstruction, AndInstruction, NotInstruction
 from type_ import BasicType, Type
 from builtins_ import BUILTINS
 
@@ -712,6 +712,26 @@ class Typer(Symbolic):
     pass
 
 
+class EqualsOperator(Operator):
+    pass
+
+
+class NotEqualsOperator(Operator):
+    pass
+
+
+class AndOperator(Operator):
+    pass
+
+
+class OrOperator(Operator):
+    pass
+
+
+class NotOperator(Operator):
+    pass
+
+
 class AssignOperator(Operator):
     pass
 
@@ -842,6 +862,66 @@ class Unpacking(Operand):
                 target.id_
                 for target in targets.value
             ]}
+        )
+
+
+class Equals(Operand):
+    def _compute_type(self):
+        return Type(BasicType.bool)
+
+    def instruction(self):
+        return make_instruction(
+            EqualsInstruction,
+            self.value,
+            self.type_
+        )
+
+
+class NotEquals(Operand):
+    def _compute_type(self):
+        return Type(BasicType.bool)
+
+    def instruction(self):
+        return make_instruction(
+            NotEqualsInstruction,
+            self.value,
+            self.type_
+        )
+
+
+class And(Operand):
+    def _compute_type(self):
+        return Type(BasicType.bool)
+
+    def instruction(self):
+        return make_instruction(
+            AndInstruction,
+            self.value,
+            self.type_
+        )
+
+
+class Or(Operand):
+    def _compute_type(self):
+        return Type(BasicType.bool)
+
+    def instruction(self):
+        return make_instruction(
+            OrInstruction,
+            self.value,
+            self.type_
+        )
+
+
+class Not(Operand):
+    def _compute_type(self):
+        return Type(BasicType.bool)
+
+    def instruction(self):
+        return make_instruction(
+            NotInstruction,
+            self.value,
+            self.type_
         )
 
 
@@ -1276,6 +1356,11 @@ def parse(code, verbose=False):
     print("Started tokenizing...")
 
     perform_conversions(code, [
+        create_text_conversion("=", EqualsOperator),
+        create_text_conversion("!=", NotEqualsOperator),
+        create_text_conversion("&", AndOperator),
+        create_text_conversion("|", OrOperator),
+        create_text_conversion("!", NotOperator),
         create_text_conversion("->", AssignOperator),
         create_text_conversion("-", MinusOperator),
         create_text_conversion("+", AdditionOperator),
@@ -1394,6 +1479,9 @@ def parse(code, verbose=False):
             lambda: DefinitionRule(code),
         ],
         [
+            lambda: GroupRule([Instantiater, TypeToken], (1,), Instantiation)
+        ],
+        [
             lambda: ConvertRule(Name, Variable),
             lambda: GroupRule([Arguments, Function], (0, 1),
                               ArgumentFunction),
@@ -1410,7 +1498,17 @@ def parse(code, verbose=False):
             lambda: GroupRule([Operand, MinusOperator, Operand],
                               (0, 2), Subtraction),
             lambda: GroupRule([MinusOperator, Operand], (1,), Negation),
-            lambda: GroupRule([Instantiater, TypeToken], (1,), Instantiation),
+
+            lambda: GroupRule([Operand, EqualsOperator, Operand],
+                              (0, 2), Equals),
+            lambda: GroupRule([Operand, NotEqualsOperator, Operand],
+                              (0, 2), NotEquals),
+            lambda: GroupRule([Operand, AndOperator, Operand],
+                              (0, 2), And),
+            lambda: GroupRule([Operand, OrOperator, Operand],
+                              (0, 2), Or),
+            lambda: GroupRule([Operand, NotOperator],
+                              (0,), Not),
 
             # Arrays
             lambda: MergeRule(

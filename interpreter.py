@@ -1,6 +1,7 @@
 from pyenum import Enum
 from builtins_ import BUILTINS
 from type_ import Type, BasicType
+from cast import stringify, boolify, floatify
 
 
 class Scope:
@@ -52,7 +53,11 @@ class Interpreter:
         self.scope = Scope(self)
         self.builtins = {
             "print": self.func_print,
-            "for": self.func_for
+            "for": self.func_for,
+            "if": self.func_if,
+            "while": self.func_while,
+            "true": True,
+            "false": False
         }
 
     def get_builtin(self, var_id):
@@ -63,7 +68,7 @@ class Interpreter:
         return builtin # Otherwise return the value
 
     def func_print(self, value):
-        print(value)
+        print(stringify(value))
 
     def func_for(self, value, func):
         if isinstance(value, float):
@@ -73,6 +78,14 @@ class Interpreter:
         value = iter(value)
         for item in value:
             self.call_function(func, item)
+
+    def func_if(self, cond, block):
+        if boolify(self.callfunction(cond)):
+            self.call_function(block, tuple())
+
+    def func_while(self, cond, block):
+        while boolify(self.callfunction(cond)):
+            self.call_function(block, tuple())
 
     def interpret(self):
         main_func = self.executable.get_function("main")

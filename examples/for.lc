@@ -1,3 +1,5 @@
 for([1, 2, 4], (a: float) {
     print(a)
 })
+
+for(3, print)
