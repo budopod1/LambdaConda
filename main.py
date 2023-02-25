@@ -22,12 +22,13 @@ def run_named(file, verbose=False):
 if __name__ == "__main__":
     # from timer import Timer
     # timer = Timer()
-    run_named("examples/argument.lc", True)
+    run_named("examples/argument.lc")
     run_named("examples/array.lc")
     run_named("examples/bool.lc")
     run_named("examples/definition.lc")
     run_named("examples/for.lc")
     run_named("examples/hello.lc")
+    run_named("examples/logic.lc")
     run_named("examples/math.lc")
     run_named("examples/scope.lc")
     run_named("examples/test.lc")

@@ -1,0 +1,8 @@
+for ([true, false], (v1: bool) {
+    for ([true, false], (v2: bool) {
+        print(v1 + ", " + v2)
+        print(v1 & v2)
+        print(v1 | v2)
+        print(!v1)
+    })
+})

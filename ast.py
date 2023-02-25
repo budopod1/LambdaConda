@@ -1036,7 +1036,7 @@ class Negation(Operand):
 class Group(Operand):
     def _compute_type(self):
         child, *_ = self.value
-        assert not _, _
+        assert not _, self.value
         return child.type_
 
     def instruction(self):
@@ -1535,8 +1535,8 @@ def parse(code, verbose=False):
                               (0, 2), And),
             lambda: GroupRule([Operand, OrOperator, Operand],
                               (0, 2), Or),
-            lambda: GroupRule([Operand, NotOperator],
-                              (0,), Not),
+            lambda: GroupRule([NotOperator, Operand],
+                              (1,), Not),
 
             # Arrays
             lambda: MergeRule(
