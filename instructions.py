@@ -6,6 +6,7 @@ from cast import stringify, boolify, floatify
 
 
 def make_instruction(instruction_type, children, type_, extra=None):
+    assert instruction_type
     return FloatingInstruction(
         instruction_type,
         [
@@ -219,8 +220,12 @@ class UnpackInstruction(Instruction):
         super().__init__(*args)
 
     def interpret(self, scope, value):
-        for var_id, item in zip(self.var_ids, value):
-            scope[var_id] = item
+        if not isinstance(value, tuple):
+            for var_id in self.var_ids:
+                scope[var_id] = value
+        else:
+            for var_id, item in zip(self.var_ids, value):
+                scope[var_id] = item
         return value
 
 

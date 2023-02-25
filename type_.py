@@ -41,4 +41,5 @@ class Type:
         return str(self)
 
 
-Type.none = Type(BasicType.none)
+for type_ in BasicType:
+    setattr(Type, type_, Type(BasicType[type_]))

@@ -1,4 +1,9 @@
 def stringify(value):
+    if isinstance(value, bool):
+        if value:
+            return "true"
+        else:
+            return "false"
     if isinstance(value, (float, int, str)):
         return str(value)
     iterable = False
@@ -20,11 +25,6 @@ def stringify(value):
             result += stringify(part)
         result += end
         return result
-    if isinstance(value, bool):
-        if value:
-            return "true"
-        else:
-            return "false"
 
 
 def floatify(value):

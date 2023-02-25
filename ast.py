@@ -17,7 +17,7 @@ TokenVisitMode = Enum("TokenVisitMode", "DEPTH")
 # TokenExtraData.UNIT specifies that the token should be treated as a
 # single unit
 TokenExtraData = Enum("TokenExtraData", "CAPPED", "UNIT")
-# Currently unused: int, bool
+RuleExtraData = Enum("RuleExtraData", "SEARCHALL")
 TAB = "    "
 
 
@@ -622,7 +622,16 @@ def tagged(token, tags):
 
 def capped(token):
     return tagged(token, [TokenExtraData.CAPPED])
-    
+
+
+class DataFunction:
+    def __init__(self, function, data):
+        self.function = function
+        self.data = data
+
+    def __call__(self, *args, **kwargs):
+        return self.function(*args, **kwargs)
+
 
 # ------------------------ #
 
@@ -867,7 +876,7 @@ class Unpacking(Operand):
 
 class Equals(Operand):
     def _compute_type(self):
-        return Type(BasicType.bool)
+        return Type.bool
 
     def instruction(self):
         return make_instruction(
@@ -879,7 +888,7 @@ class Equals(Operand):
 
 class NotEquals(Operand):
     def _compute_type(self):
-        return Type(BasicType.bool)
+        return Type.bool
 
     def instruction(self):
         return make_instruction(
@@ -891,7 +900,7 @@ class NotEquals(Operand):
 
 class And(Operand):
     def _compute_type(self):
-        return Type(BasicType.bool)
+        return Type.bool
 
     def instruction(self):
         return make_instruction(
@@ -903,7 +912,7 @@ class And(Operand):
 
 class Or(Operand):
     def _compute_type(self):
-        return Type(BasicType.bool)
+        return Type.bool
 
     def instruction(self):
         return make_instruction(
@@ -915,7 +924,7 @@ class Or(Operand):
 
 class Not(Operand):
     def _compute_type(self):
-        return Type(BasicType.bool)
+        return Type.bool
 
     def instruction(self):
         return make_instruction(
@@ -943,7 +952,7 @@ class Addition(Operand):
 
     def instruction(self):
         instruction = None
-        basic_type = self.type_.type_ 
+        basic_type = self.type_.type_
         if basic_type == BasicType.float:
             instruction = AdditionInstruction
         elif basic_type == BasicType.str:
@@ -1100,7 +1109,7 @@ class Function(Operand, Block):
                 if return_type:
                     return return_type
                 else:
-                    return Type.none
+                    return Type.tuple
         return_type = self.visit(
             return_visit, 
             tuple(), 
@@ -1110,7 +1119,7 @@ class Function(Operand, Block):
             if return_type.is_none():
                 return Type.none
             return Type(BasicType.func, [return_type])
-        return Type(BasicType.func, [Type.none])
+        return Type(BasicType.func, [Type.tuple])
 
 
 
@@ -1293,6 +1302,25 @@ class DefinitionRule:
         return []
 
 
+class ReturnRule:
+    def __call__(self, token):
+        if not token.is_a(Function):
+            return TokenSearchStatus.FAIL
+        child, *extra = token.value
+        if extra:
+            return TokenSearchStatus.FAIL
+        return (
+            TokenSearchStatus.FINISH 
+            if child.is_a(Operand) and not child.is_a(Return) else
+            TokenSearchStatus.FAIL
+        )
+
+    def result(self, tokens):
+        token, = tokens
+        return_value, = token.value
+        return [token.clone([Return([return_value])])]
+
+
 def parse(code, verbose=False):
     # Not a great solution but whatever
     if not verbose:
@@ -1356,8 +1384,8 @@ def parse(code, verbose=False):
     print("Started tokenizing...")
 
     perform_conversions(code, [
-        create_text_conversion("=", EqualsOperator),
         create_text_conversion("!=", NotEqualsOperator),
+        create_text_conversion("=", EqualsOperator),
         create_text_conversion("&", AndOperator),
         create_text_conversion("|", OrOperator),
         create_text_conversion("!", NotOperator),
@@ -1549,6 +1577,12 @@ def parse(code, verbose=False):
             lambda: GroupRule([Operand, Group], (0, 1), FunctionCall),
             lambda: GroupRule([ReturnOperator, Operand],
                             (1,), Return),
+        ],
+        [
+            DataFunction(
+                lambda: ReturnRule(), 
+                [RuleExtraData.SEARCHALL]
+            ),
         ]
     ]
 
@@ -1556,7 +1590,10 @@ def parse(code, verbose=False):
         if token.is_text():
             return
         rule, = args
-        if TokenExtraData.CAPPED in token.tags:
+        extra_data = []
+        if isinstance(rule, DataFunction):
+            extra_data = rule.data
+        if TokenExtraData.CAPPED in token.tags and RuleExtraData.SEARCHALL not in extra_data:
             return
         if id(rule) in token.tags:
             return

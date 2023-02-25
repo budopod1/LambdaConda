@@ -80,12 +80,12 @@ class Interpreter:
             self.call_function(func, item)
 
     def func_if(self, cond, block):
-        if boolify(self.callfunction(cond)):
-            self.call_function(block, tuple())
+        if boolify(self.call_function(cond)):
+            self.call_function(block)
 
     def func_while(self, cond, block):
-        while boolify(self.callfunction(cond)):
-            self.call_function(block, tuple())
+        while boolify(self.call_function(cond)):
+            self.call_function(block)
 
     def interpret(self):
         main_func = self.executable.get_function("main")
@@ -94,7 +94,7 @@ class Interpreter:
     def call_builtin(self, func_name, arguments):
         return self.builtins[func_name](*arguments)
 
-    def call_function(self, func_name, arguments):
+    def call_function(self, func_name, arguments=tuple()):
         if func_name in self.builtins:
             signature =  BUILTINS[func_name]
         else:
@@ -125,13 +125,6 @@ class Interpreter:
             for argument, value in zip(function.arguments, arguments):
                 self.scope[argument.id_] = value
         for instruction in function:
-            for param in ([
-                    self.scope.outputs[param] 
-                    for param in instruction.params
-                ]):
-                if param is None:
-                    print(instruction)
-            
             result = instruction.interpret(
                 self.scope, 
                 *[
@@ -139,12 +132,10 @@ class Interpreter:
                     for param in instruction.params
                 ]
             )
-            
-            if result is None:
-                print(instruction)
     
             if isinstance(result, SpecialInstruction):
                 result, return_value = self.special_instruction(result)
                 if return_value is not None:
                     return return_value
             self.scope.outputs[instruction.id_] = result
+        return tuple()
