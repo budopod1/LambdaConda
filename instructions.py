@@ -247,6 +247,26 @@ class NotEqualsInstruction(Instruction):
         return v1 != v2
 
 
+class LessInstruction(Instruction):
+    def interpret(self, scope, v1, v2):
+        return v1 < v2
+
+
+class GreaterInstruction(Instruction):
+    def interpret(self, scope, v1, v2):
+        return v1 > v2
+
+
+class LessEqualInstruction(Instruction):
+    def interpret(self, scope, v1, v2):
+        return v1 <= v2
+
+
+class GreaterEqualInstruction(Instruction):
+    def interpret(self, scope, v1, v2):
+        return v1 >= v2
+
+
 class AndInstruction(Instruction):
     def interpret(self, scope, v1, v2):
         return boolify(v1) and boolify(v2)

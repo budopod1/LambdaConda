@@ -25,6 +25,7 @@ if __name__ == "__main__":
     run_named("examples/argument.lc")
     run_named("examples/array.lc")
     run_named("examples/bool.lc")
+    run_named("examples/comp.lc")
     run_named("examples/definition.lc")
     run_named("examples/fib.lc")
     run_named("examples/for.lc")

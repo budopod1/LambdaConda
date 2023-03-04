@@ -1,6 +1,6 @@
 from pyenum import Enum
 from id_ import IDGetter
-from instructions import make_instruction, FunctionInstruction, AssignInstruction, InstantiationInstruction, VariableInstruction, UnpackInstruction, FunctionCallInstruction, AdditionInstruction, TupleInstruction, ArrayInstruction, NegationInstruction, ReturnInstruction, ConcatenationInstruction, JoinTupleInstruction, JoinArrayInstruction, ConstantInstruction, SubtractionInstruction, DivisionInstruction, MultiplicationInstruction, ExponentiationInstruction, EqualsInstruction, NotEqualsInstruction, OrInstruction, AndInstruction, NotInstruction
+from instructions import make_instruction, FunctionInstruction, AssignInstruction, InstantiationInstruction, VariableInstruction, UnpackInstruction, FunctionCallInstruction, AdditionInstruction, TupleInstruction, ArrayInstruction, NegationInstruction, ReturnInstruction, ConcatenationInstruction, JoinTupleInstruction, JoinArrayInstruction, ConstantInstruction, SubtractionInstruction, DivisionInstruction, MultiplicationInstruction, ExponentiationInstruction, EqualsInstruction, NotEqualsInstruction, OrInstruction, AndInstruction, NotInstruction, LessInstruction, GreaterInstruction, LessEqualInstruction, GreaterEqualInstruction
 from type_ import BasicType, Type
 from builtins_ import BUILTINS
 
@@ -699,6 +699,14 @@ class GroupClose(Symbolic):
     pass
 
 
+class LeftAngleBracket(Symbolic):
+    pass
+
+
+class RightAngleBracket(Symbolic):
+    pass
+
+
 class ArrayOpen(Symbolic):
     pass
 
@@ -712,6 +720,14 @@ class Comma(Symbolic):
 
 
 class Operator(Symbolic):
+    pass
+
+
+class LessEqualOperator(Operator):
+    pass
+
+
+class GreaterEqualOperator(Operator):
     pass
 
 
@@ -893,6 +909,54 @@ class NotEquals(Operand):
     def instruction(self):
         return make_instruction(
             NotEqualsInstruction,
+            self.value,
+            self.type_
+        )
+
+
+class Less(Operand):
+    def _compute_type(self):
+        return Type.bool
+
+    def instruction(self):
+        return make_instruction(
+            LessInstruction,
+            self.value,
+            self.type_
+        )
+
+
+class Greater(Operand):
+    def _compute_type(self):
+        return Type.bool
+
+    def instruction(self):
+        return make_instruction(
+            GreaterInstruction,
+            self.value,
+            self.type_
+        )
+
+
+class LessEqual(Operand):
+    def _compute_type(self):
+        return Type.bool
+
+    def instruction(self):
+        return make_instruction(
+            LessEqualInstruction,
+            self.value,
+            self.type_
+        )
+
+
+class GreaterEqual(Operand):
+    def _compute_type(self):
+        return Type.bool
+
+    def instruction(self):
+        return make_instruction(
+            GreaterEqualInstruction,
             self.value,
             self.type_
         )
@@ -1126,14 +1190,6 @@ class Function(Operand, Block):
 class TypeToken(Node):
     def to_type(self):
         return Type(BasicType[condense_tokens(self.value)])
-
-
-class GenericOpen(Symbolic):
-    pass
-
-
-class GenericClose(Symbolic):
-    pass
 
 
 class GenericList(Node):
@@ -1384,6 +1440,8 @@ def parse(code, verbose=False):
     print("Started tokenizing...")
 
     perform_conversions(code, [
+        create_text_conversion("<=", LessEqualOperator),
+        create_text_conversion(">=", GreaterEqualOperator),
         create_text_conversion("!=", NotEqualsOperator),
         create_text_conversion("=", EqualsOperator),
         create_text_conversion("&", AndOperator),
@@ -1406,8 +1464,8 @@ def parse(code, verbose=False):
         create_text_conversion(":", Typer),
         create_text_conversion("[", ArrayOpen),
         create_text_conversion("]", ArrayClose),
-        create_text_conversion("<", GenericOpen),
-        create_text_conversion(">", GenericClose),
+        create_text_conversion("<", LeftAngleBracket),
+        create_text_conversion(">", RightAngleBracket),
         create_text_conversion("new", Instantiater),
         create_text_conversion("def", Define),
     ])
@@ -1450,17 +1508,17 @@ def parse(code, verbose=False):
                 0, (1,), UnfinishedGenericList
             ),
             lambda: GroupRule(
-                [GenericOpen, TypeToken, Comma, TypeToken, Comma],
+                [LeftAngleBracket, TypeToken, Comma, TypeToken, Comma],
                 (1, 3), UnfinishedGenericList
             ),
             lambda: GroupRule(
-                [GenericOpen, TypeToken, Comma, TypeToken, GenericClose],
+                [LeftAngleBracket, TypeToken, Comma, TypeToken, RightAngleBracket],
                 (1, 3), GenericList
             ),
-            lambda: GroupRule([GenericOpen, TypeToken, GenericClose],
+            lambda: GroupRule([LeftAngleBracket, TypeToken, RightAngleBracket],
                               (1,), GenericList),
             lambda: MergeRule(
-                [UnfinishedGenericList, TypeToken, GenericClose], 0,
+                [UnfinishedGenericList, TypeToken, RightAngleBracket], 0,
                 (1,), GenericList
             ),
             
@@ -1531,6 +1589,17 @@ def parse(code, verbose=False):
                               (0, 2), Equals),
             lambda: GroupRule([Operand, NotEqualsOperator, Operand],
                               (0, 2), NotEquals),
+            
+            lambda: GroupRule([Operand, LeftAngleBracket, Operand],
+                              (0, 2), Less),
+            lambda: GroupRule([Operand, RightAngleBracket, Operand],
+                              (0, 2), Greater),
+            
+            lambda: GroupRule([Operand, LessEqualOperator, Operand],
+                              (0, 2), LessEqual),
+            lambda: GroupRule([Operand, GreaterEqualOperator, Operand],
+                              (0, 2), GreaterEqual),
+            
             lambda: GroupRule([Operand, AndOperator, Operand],
                               (0, 2), And),
             lambda: GroupRule([Operand, OrOperator, Operand],
